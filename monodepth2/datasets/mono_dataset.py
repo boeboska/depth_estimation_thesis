@@ -24,6 +24,13 @@ def pil_loader(path):
         with Image.open(f) as img:
             return img.convert('RGB')
 
+def pil_loader_attention(path):
+    # open path as file to avoid ResourceWarning
+    # (https://github.com/python-pillow/Pillow/issues/835)
+    with open(path, 'rb') as f:
+        with Image.open(f) as img:
+            return img.convert('L')
+
 
 class MonoDataset(data.Dataset):
     """Superclass for monocular dataloaders
@@ -39,29 +46,37 @@ class MonoDataset(data.Dataset):
         img_ext
     """
     def __init__(self,
+                 attention_mask_loss,
+                 edge_loss,
                  data_path,
+                 attention_path,
+                 attention_threshold,
                  filenames,
                  height,
                  width,
                  frame_idxs,
                  num_scales,
                  is_train=False,
-                 img_ext='.jpg'):
+                 img_ext='.jpg',):
         super(MonoDataset, self).__init__()
 
+        self.attention_mask_loss = attention_mask_loss
+        self.edge_loss = edge_loss
+        self.attention_threshold = attention_threshold
+        self.attention_path = attention_path
         self.data_path = data_path
         self.filenames = filenames
         self.height = height
         self.width = width
         self.num_scales = num_scales
         self.interp = Image.ANTIALIAS
-
         self.frame_idxs = frame_idxs
 
         self.is_train = is_train
         self.img_ext = img_ext
 
         self.loader = pil_loader
+        self.attention_loader = pil_loader_attention
         self.to_tensor = transforms.ToTensor()
 
         # We need to specify augmentations differently in newer versions of torchvision.
@@ -125,8 +140,8 @@ class MonoDataset(data.Dataset):
 
         <frame_id> is either:
             an integer (e.g. 0, -1, or 1) representing the temporal step relative to 'index',
-        or
-            "s" for the opposite image in the stereo pair.
+        ['or
+            "s" for the opposite image in the stereo pair.']
 
         <scale> is an integer representing the scale of the image relative to the fullsize image:
             -1      images at native resolution as loaded from disk
@@ -136,6 +151,8 @@ class MonoDataset(data.Dataset):
             3       images resized to (self.width // 8, self.height // 8)
         """
         inputs = {}
+        # print("GET ITEM")
+
 
         do_color_aug = self.is_train and random.random() > 0.5
         do_flip = self.is_train and random.random() > 0.5
@@ -153,12 +170,57 @@ class MonoDataset(data.Dataset):
         else:
             side = None
 
+
+        # print("hidde", self.frame_idxs)
         for i in self.frame_idxs:
+            # print("ii", i)
             if i == "s":
                 other_side = {"r": "l", "l": "r"}[side]
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index, other_side, do_flip)
             else:
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index + i, side, do_flip)
+
+            # only add the attention masks for the target frame (frame 0)
+                if self.edge_loss or self.attention_mask_loss:
+                    if i == 0:
+
+                        # look up attention masks for target frame
+                        attention_masks = self.get_attention(folder, frame_index, side, do_flip)
+
+                        assert len(attention_masks) == 100, "There should be 100 attention masks saved for this kitti image. its now {}".format(len(attention_masks))
+
+                        # decide which attention masks will be used based on attention_threshold probability
+                        attention_list = []
+                        loop_count = 0
+
+                        a = torch.empty(30, self.height, self.width)
+                        for key, value in attention_masks.items():
+
+                            if loop_count > 29:
+                                break
+
+                            # if attention prob is high enough add to inputs
+
+                            # if float(key.split("_")[1].split("jpg")[0][:-1]) >= self.attention_threshold:
+                            #     count +=1
+
+
+                            if float(key.split("_")[1].split("jpg")[0][:-1]) >= self.attention_threshold:
+                                value = transforms.ToTensor()(value)
+                                a[loop_count] = value
+                                # print(value.mean())
+                                loop_count += 1
+                                # print("loop count", loop_count)
+
+
+
+                        inputs[("attention")] = a
+                        # inputs[("test")] = [1, 2, 3]
+
+
+
+                                # print("inputs len", len(inputs))
+        # print("@@@")
 
         # adjusting intrinsics to match each scale in the pyramid
         for scale in range(self.num_scales):
@@ -196,6 +258,9 @@ class MonoDataset(data.Dataset):
             stereo_T[0, 3] = side_sign * baseline_sign * 0.1
 
             inputs["stereo_T"] = torch.from_numpy(stereo_T)
+
+        # print(inputs.keys())
+        # print(inputs[('color', 0, 0)].size())
 
         return inputs
 

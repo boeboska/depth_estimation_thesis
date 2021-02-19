@@ -1,0 +1,47 @@
+backcall @ file:///home/ktietz/src/ci/backcall_1611930011877/work
+certifi==2020.12.5
+cffi @ file:///C:/ci/cffi_1606255207413/work
+cloudpickle @ file:///tmp/build/80754af9/cloudpickle_1598884132938/work
+colorama @ file:///tmp/build/80754af9/colorama_1607707115595/work
+cycler==0.10.0
+cytoolz==0.11.0
+dask @ file:///tmp/build/80754af9/dask-core_1611341281313/work
+decorator @ file:///home/ktietz/src/ci/decorator_1611930055503/work
+imagecodecs @ file:///C:/ci/imagecodecs_1611243754207/work
+imageio @ file:///tmp/build/80754af9/imageio_1594161405741/work
+ipython @ file:///C:/ci/ipython_1612213113434/work
+ipython-genutils @ file:///tmp/build/80754af9/ipython_genutils_1606773439826/work
+jedi==0.17.0
+kiwisolver @ file:///C:/ci/kiwisolver_1612282618948/work
+matplotlib @ file:///C:/ci/matplotlib-base_1603356257853/work
+mkl-fft==1.2.0
+mkl-random==1.1.1
+mkl-service==2.3.0
+networkx @ file:///tmp/build/80754af9/networkx_1598376031484/work
+numpy @ file:///C:/ci/numpy_and_numpy_base_1603468620949/work
+olefile==0.46
+ortools==7.6.7691
+parso @ file:///tmp/build/80754af9/parso_1607623074025/work
+pickleshare @ file:///tmp/build/80754af9/pickleshare_1606932040724/work
+Pillow @ file:///C:/ci/pillow_1609786872067/work
+prompt-toolkit @ file:///tmp/build/80754af9/prompt-toolkit_1602688806899/work
+protobuf==3.12.2
+pycparser @ file:///tmp/build/80754af9/pycparser_1594388511720/work
+Pygments @ file:///tmp/build/80754af9/pygments_1610565767015/work
+pyparsing @ file:///home/linux1/recipes/ci/pyparsing_1610983426697/work
+python-dateutil @ file:///home/ktietz/src/ci/python-dateutil_1611928101742/work
+python-sat==0.1.5.dev14
+PyWavelets @ file:///C:/ci/pywavelets_1601658407053/work
+PyYAML==5.4.1
+scikit-image==0.17.2
+scipy @ file:///C:/ci/scipy_1612469765256/work
+six==1.15.0
+tensorboardX==1.4
+tifffile @ file:///tmp/build/80754af9/tifffile_1610739638720/work
+toolz @ file:///home/linux1/recipes/ci/toolz_1610987900194/work
+torch==0.4.1
+torchvision==0.2.1
+tornado @ file:///C:/ci/tornado_1606935947090/work
+traitlets @ file:///home/ktietz/src/ci/traitlets_1611929699868/work
+wcwidth @ file:///tmp/build/80754af9/wcwidth_1593447189090/work
+wincertstore==0.2

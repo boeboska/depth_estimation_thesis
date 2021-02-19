@@ -21,7 +21,7 @@ class KITTIDataset(MonoDataset):
     def __init__(self, *args, **kwargs):
         super(KITTIDataset, self).__init__(*args, **kwargs)
 
-        # NOTE: Make sure your intrinsics matrix is *normalized* by the original image size    
+        # NOTE: Make sure your intrinsics matrix is *normalized* by the original image size
         self.K = np.array([[0.58, 0, 0.5, 0],
                            [0, 1.92, 0.5, 0],
                            [0, 0, 1, 0],
@@ -49,6 +49,44 @@ class KITTIDataset(MonoDataset):
             color = color.transpose(pil.FLIP_LEFT_RIGHT)
 
         return color
+
+    def get_attention(self, folder, frame_index, side, do_flip):
+
+        attention_masks = {}
+
+        # print("folder", folder)
+        # print("frame index", frame_index)
+
+        # folder = '2011_09_26/2011_09_26_drive_0001_sync/'
+        # frame_index = '0002/'
+        # side = 'r'
+        # print("folder", folder)
+        frame_index_start = ""
+        frame_index_start = f"{0:010}"
+        length = len(str(frame_index))
+        frame_index_start = frame_index_start[:-length]
+        frame_index = frame_index_start + str(frame_index)
+        # print("frame _ index", frame_index)
+
+        path = self.attention_path + folder + "/" + "image_0{}/data/".format(self.side_map[side])  + str(frame_index)
+
+        # print("path", path)
+
+        for subdir, dirs, files in os.walk(path):
+             for file in files:
+                 # print("file", file)
+                 # probability = file.split("_")[1].split("jpg")[0][:-1]
+                 # print("PROB", probability)
+                 new_path = path + "/" + file
+                 current_attention = self.attention_loader(new_path)
+
+                 if do_flip:
+                     current_attention = current_attention.transpose(pil.FLIP_LEFT_RIGHT)
+                 attention_masks[file] = current_attention
+                 # print(self.attention_loader(new_path))
+
+        return attention_masks
+
 
 
 class KITTIRAWDataset(KITTIDataset):

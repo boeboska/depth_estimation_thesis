@@ -1,0 +1,32 @@
+z --no_cuda
+
+
+apples:
+python train.py --model_name mono_model_11_01 --png --eval_split apple_split --split apple_split --dataset apple --no_cuda
+
+inference:
+python test_simple.py --image_path assets/main_img.jpg --model_name weights_0 --no_cuda
+
+
+
+--model_name > pretrained model. dit is het weights mapje wat het script opslaat
+sample_image2.jpeg
+tree_test.jpg
+0000000604.png
+
+
+Finetune:
+python train.py --model_name 05_01_p2 --load_weights_folder models/mono_640x192 --png --split short
+python train.py --load_weights_folder models/mono_640x192 --png
+
+
+set CUDA_VISIBLE_DEVICES=2,3 & python my_script.py
+
+--model_name ... hoe wil je dat de naam van het model wordt opgeslagen
+--load_wiehgts_folder ... waar het model staat dat je al deels getrained hebt
+
+
+
+python get_attention_maps.py --img_path 0000000604.png --confidence_threshold=0.9
+
+

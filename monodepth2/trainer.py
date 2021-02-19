@@ -4,10 +4,13 @@
 # which allows for non-commercial use only, the full terms of which are made
 # available in the LICENSE file.
 
+
+
 from __future__ import absolute_import, division, print_function
 
 import numpy as np
 import time
+import os
 
 import torch
 import torch.nn.functional as F
@@ -25,8 +28,35 @@ import datasets
 import networks
 from IPython import embed
 
+# attention
+
+import matplotlib.pyplot as plt; plt.rcdefaults()
+import matplotlib.pyplot as plt
+import collections
+from torchvision import transforms
+import copy
+import cv2
+import matplotlib as mpl
+import matplotlib.cm as cm
+
+torch.backends.cudnn.enabled = False
+
+torch.cuda.empty_cache()
+
+import os
+
+# os.environ["KMP_DUPLICATE_LIB_OK"]= True
+#
+# os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+# os.environ["KMP_DUPLICATE_LIB_OK"]= "True"
+# os.environ['KMP_DUPLICATE_LIB_OK']='True'
+# os.environ["CUDA_VISIBLE_DEVICES"] ='True'
+
 
 class Trainer:
+    torch.cuda.empty_cache()
+
+
     def __init__(self, options):
         self.opt = options
         self.log_path = os.path.join(self.opt.log_dir, self.opt.model_name)
@@ -39,6 +69,8 @@ class Trainer:
         self.parameters_to_train = []
 
         self.device = torch.device("cpu" if self.opt.no_cuda else "cuda")
+
+        print("device", self.device)
 
         self.num_scales = len(self.opt.scales)
         self.num_input_frames = len(self.opt.frame_ids)
@@ -124,14 +156,17 @@ class Trainer:
         num_train_samples = len(train_filenames)
         self.num_total_steps = num_train_samples // self.opt.batch_size * self.opt.num_epochs
 
+
         train_dataset = self.dataset(
-            self.opt.data_path, train_filenames, self.opt.height, self.opt.width,
+            self.opt.attention_mask_loss,  self.opt.edge_loss, self.opt.data_path, self.opt.attention_path, self.opt.attention_threshold, train_filenames, self.opt.height, self.opt.width,
             self.opt.frame_ids, 4, is_train=True, img_ext=img_ext)
+
         self.train_loader = DataLoader(
             train_dataset, self.opt.batch_size, True,
             num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
+
         val_dataset = self.dataset(
-            self.opt.data_path, val_filenames, self.opt.height, self.opt.width,
+            self.opt.attention_mask_loss, self.opt.edge_loss, self.opt.data_path, self.opt.attention_path, self.opt.attention_threshold, val_filenames, self.opt.height, self.opt.width,
             self.opt.frame_ids, 4, is_train=False, img_ext=img_ext)
         self.val_loader = DataLoader(
             val_dataset, self.opt.batch_size, True,
@@ -198,13 +233,19 @@ class Trainer:
         print("Training")
         self.set_train()
 
+        prob_sum_mask = {}
+
         for batch_idx, inputs in enumerate(self.train_loader):
+            print(batch_idx)
+
+
 
             before_op_time = time.time()
 
-            outputs, losses = self.process_batch(inputs)
-
+            outputs, losses = self.process_batch(inputs, batch_idx)
+            # breakpoint()
             self.model_optimizer.zero_grad()
+
             losses["loss"].backward()
             self.model_optimizer.step()
 
@@ -221,11 +262,11 @@ class Trainer:
                     self.compute_depth_losses(inputs, outputs, losses)
 
                 self.log("train", inputs, outputs, losses)
-                self.val()
+                self.val(batch_idx)
 
             self.step += 1
 
-    def process_batch(self, inputs):
+    def process_batch(self, inputs, batch_idx):
         """Pass a minibatch through the network and generate images and losses
         """
         for key, ipt in inputs.items():
@@ -248,6 +289,7 @@ class Trainer:
             features = self.models["encoder"](inputs["color_aug", 0, 0])
             outputs = self.models["depth"](features)
 
+
         if self.opt.predictive_mask:
             outputs["predictive_mask"] = self.models["predictive_mask"](features)
 
@@ -255,7 +297,9 @@ class Trainer:
             outputs.update(self.predict_poses(inputs, features))
 
         self.generate_images_pred(inputs, outputs)
-        losses = self.compute_losses(inputs, outputs)
+
+
+        losses = self.compute_losses(inputs, outputs, batch_idx)
 
         return outputs, losses
 
@@ -317,7 +361,7 @@ class Trainer:
 
         return outputs
 
-    def val(self):
+    def val(self, batch_idx):
         """Validate the model on a single minibatch
         """
         self.set_eval()
@@ -328,7 +372,7 @@ class Trainer:
             inputs = self.val_iter.next()
 
         with torch.no_grad():
-            outputs, losses = self.process_batch(inputs)
+            outputs, losses = self.process_batch(inputs, batch_idx)
 
             if "depth_gt" in inputs:
                 self.compute_depth_losses(inputs, outputs, losses)
@@ -337,6 +381,325 @@ class Trainer:
             del inputs, outputs, losses
 
         self.set_train()
+
+    def edge_dection_loss(self, scale, outputs, inputs, batch_idx):
+
+        low_edge_value = 0.15
+        high_edge_value = 0.16
+
+        edge_loss = []
+
+        disp = outputs[("disp", 0)]
+
+
+
+        # disp_resized = torch.nn.functional.interpolate(
+        #     disp, (self.opt.height, self.opt.width), mode="bilinear", align_corners=False)
+        #
+        # # Saving colormapped depth image
+        # disp_resized_np = disp_resized.squeeze().cpu().detach().numpy()
+        # vmax = np.percentile(disp_resized_np, 95)
+        # normalizer = mpl.colors.Normalize(vmin=disp_resized_np.min(), vmax=vmax)
+        # mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
+        # # breakpoint()
+        # colormapped_im = (mapper.to_rgba(disp_resized_np) * 255).astype(np.uint8)
+
+
+
+        # disp = disp.squeeze(0).squeeze(0)
+
+
+        # select the depth image
+        # depth = outputs[('depth', 0, scale)]  # 1, 1, 192, 640
+
+        original_img = inputs["color_aug", 0, 0]
+        original_img = np.array(original_img.cpu().detach().numpy())
+        original_img = np.swapaxes(original_img, 1, 2)
+        original_img = np.swapaxes(original_img, 2, 3)
+
+
+        # print("type original img", type(original_img))
+        # print("size", original_img.shape)
+
+        # select the mask images corresponding to the target image
+        attention_mask = inputs['attention'].to(self.device)
+
+        # breakpoint()
+        original_attention = torch.clone(attention_mask)
+
+        # everywhing which doesn't belong to the mask, set off
+        attention_mask[attention_mask < 0.7] = 0
+
+        # everywhing which doesn't belong to the mask, set on
+        attention_mask[attention_mask >= 0.7] = 1
+
+        # create only the depth pixels that lie inside the attention mask
+        depth_mask = attention_mask * disp
+
+
+        depth_mask_test = attention_mask * disp
+
+
+        depth_mask_test = np.array(depth_mask_test.cpu().detach().numpy().astype(np.float32))
+
+        # filter out dimension for correct plotting
+        disp = disp.squeeze(1)
+        disp = np.array(disp.cpu().detach().numpy())
+
+        depth_mask = np.array(depth_mask.cpu().detach().numpy())
+
+
+        # * 255 for canny edge working
+        depth_mask = depth_mask * 255
+
+        # cast to int for correct canny input
+        depth_mask = np.uint8(depth_mask)
+
+        for batch in range(self.opt.batch_size):
+            # breakpoint()
+            for attention in range(depth_mask.shape[1]):
+
+                # dont calculate edged when attention mask is to big. Because then there will be noise to training. Edge detection won't work as we want
+                if attention_mask[batch][attention].sum() > self.opt.attention_sum:
+                    continue
+
+                edges_disp = cv2.Canny(depth_mask[batch][attention], low_edge_value*255, high_edge_value*255, apertureSize=3, L2gradient=False)
+                kernel = np.ones((5, 5), np.uint8)
+                erosion = cv2.erode(depth_mask[batch][attention], kernel, iterations=3)
+                result = cv2.bitwise_and(edges_disp, edges_disp, mask=erosion)
+
+                if batch_idx % 50 == 0:
+                    fig, ax = plt.subplots(7, 1)
+
+                    ax[0].imshow(original_img[batch])
+                    ax[0].title.set_text('Original image')
+
+                    ax[1].imshow(disp[batch])
+                    ax[1].title.set_text('disp')
+
+                    ax[2].imshow(original_attention.cpu()[batch][attention])
+                    ax[2].title.set_text('Attention mask')
+
+                    ax[3].imshow(depth_mask[batch][attention])
+                    ax[3].title.set_text('depth mask')
+
+                    ax[4].imshow(depth_mask_test[batch][attention])
+                    ax[4].title.set_text('depth mask TEST')
+
+                    ax[5].imshow(edges_disp)
+                    ax[5].title.set_text('Edges disp before erosion')
+
+                    ax[6].imshow(result)
+                    ax[6].title.set_text('Edges disp after erosion')
+                    # plt.show()
+                    # plt.save()
+                    fig.savefig('edge_experiment/epoch_{}batch_{}sum_{}.png'.format(self.epoch, batch_idx, result.sum()))
+                    plt.close()
+
+                edge_loss.append(result.sum())
+
+        edge_loss = np.array(edge_loss)
+        return np.mean(edge_loss)
+
+
+    def attention_depth_loss(self, scale, outputs, inputs):
+
+        start = time.time()
+
+        # attention_loss = []
+        # loop over the rescaled depth images. all depth image are size 1, 1, 192, 640
+        depth = outputs[('depth', 0, scale)] # 1, 1, 192, 640
+
+        # inputs[('attention', '18_0.99.jpg')].size()   = 1, 1, 192, 640
+        # breakpoint()
+        # fig, ax = plt.subplots(2, 1)
+
+        # target_img = inputs["color_aug", 0, 0].squeeze(0).permute(1, 2, 0).cpu()
+        # ax[0].imshow(target_img)
+        # attention_prob = key[1].split('_')[1].split('.jpg')[0]
+
+        # ax[1].imshow(inputs[key].squeeze(0).squeeze(0).cpu(), cmap= 'cividis')
+
+        # plt.show()
+
+        attention_mask = inputs['attention'].to(self.device)
+
+        breakpoint()
+
+
+
+
+        # everywhing which doesn't belong to the mask, set off
+        attention_mask[attention_mask < 0.8] = 0
+
+        # everything which belongs to the mask, set onn
+        attention_mask[attention_mask >= 0.8] = 1
+
+
+        # here you only keep the depth pixels where the mask is
+        depth_mask = attention_mask * depth
+        depth_mask = depth_mask.to(self.device)
+
+        # calculate mean depth
+        depth_mask = depth_mask.view(depth_mask.size()[0], -1).to(self.device)
+        row_sum = depth_mask.sum(dim=1).to(self.device)
+        mask = depth_mask != 0
+        mask = mask.to(self.device)
+        non_zero = mask.sum(dim=1).to(self.device)
+        mean_depth = row_sum / non_zero
+
+        # check if depth pixel is inside the mask value
+        # this is the condition for the thorch.where function. Because you only want to calculate the loss for depth values which
+        # are withing the depth mask (depth image DOT attention mask). So you only want the non zero values
+        cond = depth_mask != 0
+        cond = cond.to(self.device)
+
+
+        depth_mask = depth_mask * 1000000
+        depth_mask = depth_mask.type(torch.int64).to(self.device)
+        mean_depth = mean_depth * 1000000
+        mean_depth = mean_depth.to(dtype=torch.int).to(self.device)
+
+        # squeeze the mean depth value over the dimens for a correct torch where
+        mean_depth = mean_depth.unsqueeze(-1).to(self.device)
+        mean_depth = mean_depth.repeat_interleave(depth_mask.size()[1], dim=1).to(self.device)
+
+        # # if condition is true, the loss is the depth pixel value withing the depth mask - avg depth value. otherwise loss = 0
+        loss = torch.where(cond.to(self.device), abs(depth_mask.to(self.device) - mean_depth.to(self.device)), torch.tensor(0).to(self.device)).to(self.device)
+
+
+        loss_b = loss / 1000000.
+
+        row_sum = loss_b.sum(dim=1)
+
+        mask = loss_b != 0
+        non_zero = mask.sum(dim=1)
+
+        attention_loss = row_sum / non_zero
+
+
+
+        # for key in inputs.keys():
+        #     if key[0] == 'attention':
+        #
+        #         # breakpoint()
+        #
+        #
+        #         attention_mask = inputs[key]
+        #
+        #
+        #
+        #
+        #         # try to skip out ways and sky because they are nosie for training
+        #
+        #         if attention_mask.sum() > self.opt.attention_sum:
+        #             # print("found", attention_mask.sum())
+        #             continue
+        #
+        #         # 122. 880 pixels in attention mask
+        #
+        #
+        #         # here you only keep the depth pixels where the mask is
+        #         depth_mask = attention_mask * depth
+        #
+        #         # calculate depth mean by summing all depth values without zero values because zero values are not inside the mask
+        #         row_sum = depth_mask.sum(dim=1) # sum of each row value in tensor
+        #         non_zero = (depth_mask != 0).sum(dim=1) # count how many non zero values there are in each tensor row
+        #         mean_depth = row_sum.sum() / non_zero.sum() # divide row total by the amount of non zero values
+        #
+        #         # check if depth pixel is inside the mask value
+        #         # this is the condition for the thorch.where function. Because you only want to calculate the loss for depth values which
+        #         # are withing the depth mask (depth image DOT attention mask). So you only want the non zero values
+        #         cond = depth_mask != 0
+        #
+        #         # if condition is true, the loss is the depth pixel value withing the depth mask - avg depth value. otherwise loss = 0
+        #         # loss = torch.where(cond, torch.FloatTensor.abs(depth_mask - mean_depth), 0)
+        #         depth_mask = depth_mask * 1000000
+        #         depth_mask = depth_mask.type(torch.int64)
+        #         mean_depth = int(mean_depth * 1000000)
+        #
+        #         loss = torch.where(cond, abs(depth_mask - mean_depth), 0)
+        #         loss_b = loss / 1000000.  # 1, 1, 192, 640
+        #
+        #         # example to show that multiplying and dividing by 1000000 doesn't change loss
+        #         # depth mask
+        #         # tensor([[[[0.0316, 0.8090],
+        #         #           [0.0000, 0.6262]]]])
+        #
+        #         # mean depth
+        #         # tensor(0.4889)
+        #
+        #         # loss
+        #         # tensor([[[[0.4574, 0.3201],
+        #         #           [0.0000, 0.1373]]]])
+        #
+        #         row_sum = loss_b.sum(dim=1)
+        #         non_zero = (loss_b != 0).sum(dim=1)
+        #         mean_loss = row_sum.sum() / non_zero.sum()  # mean loss ~ 0.0010
+        #
+        #         # mean loss for this attention mask
+        #         attention_loss.append(mean_loss)
+        # try:
+        #     attention_loss = sum(attention_loss) / len(attention_loss)
+        # except:
+        #     print("attention 0")
+        #     attention_loss = 0
+
+        return attention_loss.mean()
+
+    def attention_mask_loss(self, inputs):
+
+        # select the mask images corresponding to the target image
+        attention_mask = inputs['attention'].to(self.device)
+
+        # everywhing which doesn't belong to the mask, set off
+        attention_mask[attention_mask < 0.7] = 0
+
+        # everything which belongs to the mask, set onn
+        attention_mask[attention_mask >= 0.7] = 1
+
+        # batch x amount of attention. sum every attention tensor within the batch size
+        attention_sum = attention_mask.sum(-1).sum(-1)
+
+        # within a batch you have multiple attention masks. Decide how much weight each attention mask will receive.
+        # The smaller the mask the more weight it'll receive.
+
+        # summ all the attention maps within 1 batch size
+        # this is the summ of all the attention maps withing 1 batch
+        batch_sum = attention_sum.sum(-1).unsqueeze(1)
+
+        # determine weight
+        # https://math.stackexchange.com/questions/3817854/formula-for-inverse-weighted-average-smaller-value-gets-higher-weight
+        v = attention_sum / batch_sum
+        v = 1 / v
+
+        # remove inf number because 1 / 0 = inf
+        v[v == float('inf')] = 0
+
+        t = v.sum(-1).unsqueeze(1)
+
+        attention_weight_matrix = v / t
+
+        # remove nan
+        attention_weight_matrix[attention_weight_matrix != attention_weight_matrix] = 0
+
+        assert round(attention_weight_matrix.sum(-1).sum(-1).item()) == self.opt.batch_size, "The sum weight doesn't sum up to 1 per batch, namely:{}".format(attention_weight_matrix.sum(-1).sum(-1))
+        # create ones matrix
+
+
+        ones = torch.ones(size=(self.opt.batch_size, attention_mask.size()[1], attention_mask.size()[2], attention_mask.size()[3])).to(self.device)
+
+        # multiply original attention masks by their weight
+        # breakpoint()
+        attention_weight_matrix = attention_weight_matrix.unsqueeze(-1).unsqueeze(-1)
+        weight_attention_mask = attention_mask * attention_weight_matrix
+
+
+        end_weight = ones + weight_attention_mask
+
+        return end_weight
+
+
 
     def generate_images_pred(self, inputs, outputs):
         """Generate the warped (reprojected) color images for a minibatch.
@@ -390,26 +753,40 @@ class Trainer:
                     outputs[("color_identity", frame_id, scale)] = \
                         inputs[("color", frame_id, source_scale)]
 
-    def compute_reprojection_loss(self, pred, target):
+    def compute_reprojection_loss(self, pred, target, inputs):
         """Computes reprojection loss between a batch of predicted and target images
         """
         abs_diff = torch.abs(target - pred)
         l1_loss = abs_diff.mean(1, True)
 
+        if self.opt.attention_mask_loss == True:
+            attention_weight = self.attention_mask_loss(inputs)
+
         if self.opt.no_ssim:
             reprojection_loss = l1_loss
         else:
-            ssim_loss = self.ssim(pred, target).mean(1, True)
-            reprojection_loss = 0.85 * ssim_loss + 0.15 * l1_loss
+            if self.opt.attention_mask_loss:
+
+
+                ssim_loss = self.ssim(pred, target).mean(1, True)
+                reprojection_loss = 0.85 * ssim_loss *  attention_weight + 0.15 * l1_loss * attention_weight
+                # breakpoint()
+            else:
+                ssim_loss = self.ssim(pred, target).mean(1, True)
+
+                reprojection_loss = 0.85 * ssim_loss + 0.15 * l1_loss
+
+
 
         return reprojection_loss
 
-    def compute_losses(self, inputs, outputs):
+    def compute_losses(self, inputs, outputs, batch_idx):
         """Compute the reprojection and smoothness losses for a minibatch
         """
         losses = {}
         total_loss = 0
 
+        # self.opt.scales = # help = "scales used in the loss", # default = [0, 1, 2, 3])
         for scale in self.opt.scales:
             loss = 0
             reprojection_losses = []
@@ -422,19 +799,49 @@ class Trainer:
             disp = outputs[("disp", scale)]
             color = inputs[("color", 0, scale)]
             target = inputs[("color", 0, source_scale)]
+            # disp, color, target: torch.Size([1, 1, 192, 640]), torch.Size([1, 3, 192, 640]), torch.Size([1, 3, 192, 640])
 
             for frame_id in self.opt.frame_ids[1:]:
+
+                # this function selects frame ID -1 and +1. 0 is the target image. So it created two prediction images
+
                 pred = outputs[("color", frame_id, scale)]
-                reprojection_losses.append(self.compute_reprojection_loss(pred, target))
+                reprojection_losses.append(self.compute_reprojection_loss(pred, target, inputs))
 
             reprojection_losses = torch.cat(reprojection_losses, 1)
 
+            if self.opt.edge_loss:
+
+                edge_loss = self.edge_dection_loss(scale, outputs, inputs, batch_idx)
+
+                # attention_loss = self.attention_depth_loss(scale, outputs, inputs)
+
+                # print("ATTENTION", attention_loss)
+
+                # loss += self.opt.attention_weight * attention_loss / (2 ** scale)
+
+                # scale 0 = torch.Size([1, 3, 192, 640])
+                # scale 1 = torch.Size([1, 3, 96, 320])
+                # scale 2 = torch.Size([1, 3, 48, 160])
+                # scale 3 = torch.Size([1, 3, 24, 80])
+
+                # print(0, 1000 * (self.opt.disparity_smoothness * smooth_loss / (2 ** 0)))
+                # print(1, 1000 * (self.opt.disparity_smoothness * smooth_loss / (2 ** 1)))
+                # print(2, 1000 * (self.opt.disparity_smoothness * smooth_loss / (2 ** 2)))
+                # print(3, 1000 * (self.opt.disparity_smoothness * smooth_loss / (2 ** 3)))
+
+                # 0 tensor(0.0057, device='cuda:0', grad_fn= < MulBackward0 >)
+                # 1 tensor(0.0029, device='cuda:0', grad_fn= < MulBackward0 >)
+                # 2 tensor(0.0014, device='cuda:0', grad_fn= < MulBackward0 >)
+                # 3 tensor(0.0007, device='cuda:0', grad_fn= < MulBackward0 >)
+
+            # FALSE
             if not self.opt.disable_automasking:
                 identity_reprojection_losses = []
                 for frame_id in self.opt.frame_ids[1:]:
                     pred = inputs[("color", frame_id, source_scale)]
                     identity_reprojection_losses.append(
-                        self.compute_reprojection_loss(pred, target))
+                        self.compute_reprojection_loss(pred, target, inputs))
 
                 identity_reprojection_losses = torch.cat(identity_reprojection_losses, 1)
 
@@ -444,6 +851,8 @@ class Trainer:
                     # save both images, and do min all at once below
                     identity_reprojection_loss = identity_reprojection_losses
 
+
+            # FALSE
             elif self.opt.predictive_mask:
                 # use the predicted mask
                 mask = outputs["predictive_mask"]["disp", scale]
@@ -458,11 +867,13 @@ class Trainer:
                 weighting_loss = 0.2 * nn.BCELoss()(mask, torch.ones(mask.shape).cuda())
                 loss += weighting_loss.mean()
 
+            # FALSE
             if self.opt.avg_reprojection:
                 reprojection_loss = reprojection_losses.mean(1, keepdim=True)
             else:
                 reprojection_loss = reprojection_losses
 
+            # This one is performed
             if not self.opt.disable_automasking:
                 # add random numbers to break ties
                 identity_reprojection_loss += torch.randn(
@@ -472,24 +883,49 @@ class Trainer:
             else:
                 combined = reprojection_loss
 
+            # FALSE
             if combined.shape[1] == 1:
                 to_optimise = combined
             else:
                 to_optimise, idxs = torch.min(combined, dim=1)
 
+            # This one is performed
             if not self.opt.disable_automasking:
                 outputs["identity_selection/{}".format(scale)] = (
                     idxs > identity_reprojection_loss.shape[1] - 1).float()
 
+            # this is still the reprojection loss
+            # print("reporjection", to_optimise.mean())
             loss += to_optimise.mean()
 
+            # print("loss na reprojection", loss)
+
+            # calculate smooth loss
             mean_disp = disp.mean(2, True).mean(3, True)
             norm_disp = disp / (mean_disp + 1e-7)
             smooth_loss = get_smooth_loss(norm_disp, color)
 
+            # print("smooth loss zonder calc", smooth_loss)
+            # print("smooth", self.opt.disparity_smoothness * smooth_loss / (2 ** scale))
+            # print("scale", scale)
+
+            # print(0, 1000 * (self.opt.disparity_smoothness * smooth_loss / (2 ** 0)))
+            # print(1, 1000 * (self.opt.disparity_smoothness * smooth_loss / (2 ** 1)))
+            # print(2, 1000 * (self.opt.disparity_smoothness * smooth_loss / (2 ** 2)))
+            # print(3, 1000 * (self.opt.disparity_smoothness * smooth_loss / (2 ** 3)))
+            # 0 tensor(0.0057, device='cuda:0', grad_fn= < MulBackward0 >)
+            # 1 tensor(0.0029, device='cuda:0', grad_fn= < MulBackward0 >)
+            # 2 tensor(0.0014, device='cuda:0', grad_fn= < MulBackward0 >)
+            # 3 tensor(0.0007, device='cuda:0', grad_fn= < MulBackward0 >)
+
+
+            # add smooth loss to reprojection loss
             loss += self.opt.disparity_smoothness * smooth_loss / (2 ** scale)
+            # print("loss na smooth", loss)
+
             total_loss += loss
             losses["loss/{}".format(scale)] = loss
+
 
         total_loss /= self.num_scales
         losses["loss"] = total_loss

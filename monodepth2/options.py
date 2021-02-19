@@ -16,15 +16,46 @@ class MonodepthOptions:
     def __init__(self):
         self.parser = argparse.ArgumentParser(description="Monodepthv2 options")
 
+
+
+        # ATTENTION
+        self.parser.add_argument("--edge_loss",
+                                 type=bool,
+                                 help="True if you want to train with the edge loss which says that depth estimate "
+                                      "should be smooth withing an attention mask",
+                                 default=False)
+        self.parser.add_argument("--attention_mask_loss",
+                                 type=bool,
+                                 help="True if you want give more weight in SSIM and L1 on the attention mask pixels",
+                                 default=False)
+        self.parser.add_argument("--attention_path",
+                                 type=str,
+                                 help="path to the attention masks data",
+                                 default="../../../attention_masks_hidde/")
+        self.parser.add_argument("--attention_threshold",
+                                 type=float,
+                                 help="how accurate the attention maps should be",
+                                 default = 0.5)
+        self.parser.add_argument("--attention_weight",
+                                 type=float,
+                                 help="attention depth weight",
+                                 default=1e-3)
+        self.parser.add_argument("--attention_sum",
+                                 type = int,
+                                 help = "threshold of how big the attention mask may be during training",
+                                 default = 12500)
+
         # PATHS
         self.parser.add_argument("--data_path",
                                  type=str,
                                  help="path to the training data",
-                                 default=os.path.join(file_dir, "kitti_data"))
+                                 default="../../../kitti/")
+                                 # default=os.path.join(file_dir, "kitti_data"))
         self.parser.add_argument("--log_dir",
                                  type=str,
                                  help="log directory",
-                                 default=os.path.join(os.path.expanduser("~"), "tmp"))
+                                 default="../../monodepth_models/")
+                                 # default=os.path.join(os.path.expanduser("~"), "tmp"))
 
         # TRAINING options
         self.parser.add_argument("--model_name",
@@ -34,7 +65,7 @@ class MonodepthOptions:
         self.parser.add_argument("--split",
                                  type=str,
                                  help="which training split to use",
-                                 choices=["eigen_zhou", "eigen_full", "odom", "benchmark"],
+                                 choices=["eigen_zhou", "eigen_full", "odom", "benchmark", "short"],
                                  default="eigen_zhou")
         self.parser.add_argument("--num_layers",
                                  type=int,
@@ -87,7 +118,7 @@ class MonodepthOptions:
         self.parser.add_argument("--batch_size",
                                  type=int,
                                  help="batch size",
-                                 default=12)
+                                 default=2)
         self.parser.add_argument("--learning_rate",
                                  type=float,
                                  help="learning rate",
@@ -140,7 +171,7 @@ class MonodepthOptions:
         self.parser.add_argument("--num_workers",
                                  type=int,
                                  help="number of dataloader workers",
-                                 default=12)
+                                 default=6)
 
         # LOADING options
         self.parser.add_argument("--load_weights_folder",
