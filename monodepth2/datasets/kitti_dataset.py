@@ -68,9 +68,7 @@ class KITTIDataset(MonoDataset):
         frame_index = frame_index_start + str(frame_index)
         # print("frame _ index", frame_index)
 
-        path = self.attention_path + folder + "/" + "image_0{}/data/".format(self.side_map[side])  + str(frame_index)
-
-        # print("path", path)
+        path = self.attention_path + "/" + folder + "/" + "image_0{}/data/".format(self.side_map[side])  + str(frame_index)
 
         for subdir, dirs, files in os.walk(path):
              for file in files:
