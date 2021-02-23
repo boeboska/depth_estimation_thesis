@@ -30,6 +30,9 @@ from IPython import embed
 
 # attention
 
+import matplotlib
+matplotlib.use('Agg')
+
 import matplotlib.pyplot as plt; plt.rcdefaults()
 import matplotlib.pyplot as plt
 import collections
