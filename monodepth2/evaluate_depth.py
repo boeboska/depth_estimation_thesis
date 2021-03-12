@@ -79,10 +79,10 @@ def evaluate(opt):
         decoder_path = os.path.join(opt.load_weights_folder, "depth.pth")
 
         encoder_dict = torch.load(encoder_path)
-
-        dataset = datasets.KITTIRAWDataset(opt.data_path, filenames,
+        # breakpoint()
+        dataset = datasets.KITTIRAWDataset(opt.attention_mask_loss, opt.edge_loss,  opt.data_path, opt.attention_path, opt.attention_threshold, filenames,
                                            encoder_dict['height'], encoder_dict['width'],
-                                           [0], 4, is_train=False)
+                                           [0], 4, img_ext='.png'if opt.png else '.jpg', is_train=False)
         dataloader = DataLoader(dataset, 16, shuffle=False, num_workers=opt.num_workers,
                                 pin_memory=True, drop_last=False)
 
@@ -227,4 +227,6 @@ def evaluate(opt):
 
 if __name__ == "__main__":
     options = MonodepthOptions()
+    print("OPTIONS", options.parse())
+    # evaluate(options)
     evaluate(options.parse())

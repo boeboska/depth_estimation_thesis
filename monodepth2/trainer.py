@@ -165,7 +165,7 @@ class Trainer:
 
 
         train_dataset = self.dataset(
-            self.opt.mask_amount, self.opt.attention_mask_loss,  self.opt.edge_loss, self.opt.data_path, self.opt.attention_path, self.opt.attention_threshold, train_filenames, self.opt.height, self.opt.width,
+            self.opt.attention_mask_loss,  self.opt.edge_loss, self.opt.data_path, self.opt.attention_path, self.opt.attention_threshold, train_filenames, self.opt.height, self.opt.width,
             self.opt.frame_ids, 4, is_train=True, img_ext=img_ext)
 
         self.train_loader = DataLoader(
@@ -173,7 +173,7 @@ class Trainer:
             num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
 
         val_dataset = self.dataset(
-            self.opt.mask_amount, self.opt.attention_mask_loss, self.opt.edge_loss, self.opt.data_path, self.opt.attention_path, self.opt.attention_threshold, val_filenames, self.opt.height, self.opt.width,
+            self.opt.attention_mask_loss, self.opt.edge_loss, self.opt.data_path, self.opt.attention_path, self.opt.attention_threshold, val_filenames, self.opt.height, self.opt.width,
             self.opt.frame_ids, 4, is_train=False, img_ext=img_ext)
         self.val_loader = DataLoader(
             val_dataset, self.opt.batch_size, True,
@@ -400,6 +400,12 @@ class Trainer:
         and set correct dimensions for the depth image
         """
 
+        path = self.opt.log_dir + self.opt.model_name + "/" + "edge_loss_img/"
+
+
+        if not os.path.exists(path):
+            os.makedirs(path)
+
         disp_min = np.uint8(disp.min().cpu().detach().numpy() * 255)
         disp_max = np.uint8(disp.max().cpu().detach().numpy() * 255)
 
@@ -412,7 +418,7 @@ class Trainer:
         disp = disp.squeeze(1)
         disp = np.array(disp.cpu().detach().numpy())
 
-        return disp_min, disp_max, original_img, disp
+        return disp_min, disp_max, original_img, disp, path
 
     def additional_not_overlapping_check(self, attention_mask):
         # additional check if the not overlapping masks are not overlapping
@@ -433,7 +439,7 @@ class Trainer:
 
                 assert len(overlap) == 1, "there are still overlapping values"
 
-    def edge_detecion_loss(self, scale, outputs, inputs, attention_mask, batch_idx, index_nrs_not_overlapping, original_attention):
+    def edge_detection_loss(self, scale, outputs, inputs, attention_mask, batch_idx, index_nrs_not_overlapping, original_attention):
         """"
         scale: this selects the correct depth image
         outputs: for selecting the depth image
@@ -447,8 +453,6 @@ class Trainer:
         edge_loss = []
 
         # threshold for edge detection
-        low_edge_value = 0.15
-        high_edge_value = 0.16
 
         # set this on if you want to double check if the tensors are not overlapping.
         self.additional_not_overlapping_check(attention_mask)
@@ -477,8 +481,8 @@ class Trainer:
         depth_mask = np.uint8(depth_mask)
 
         # prepare images for plotting
-        if batch_idx % self.opt.save_edge_img == 0:
-            disp_min, disp_max, original_img, disp = self.prepare_edge_plot(disp, inputs)
+        if batch_idx % self.opt.save_plot_every == 0 and scale == 0:
+            disp_min, disp_max, original_img, disp, path = self.prepare_edge_plot(disp, inputs)
 
         for batch in range(self.opt.batch_size):
 
@@ -489,13 +493,13 @@ class Trainer:
                 if attention_mask[batch][attention].sum() == 0:
                     continue
 
-                edges_disp = cv2.Canny(depth_mask[batch][attention], low_edge_value*255, high_edge_value*255, apertureSize=3, L2gradient=False)
+                edges_disp = cv2.Canny(depth_mask[batch][attention], self.opt.edge_detection_threshold * 255, self.opt.edge_detection_threshold * 255, apertureSize=3, L2gradient=False)
                 kernel = np.ones((5, 5), np.uint8)
                 erosion = cv2.erode(depth_mask[batch][attention], kernel, iterations=3)
                 result = cv2.bitwise_and(edges_disp, edges_disp, mask=erosion)
 
                 # if you found an edge and save the image. only once in the self.opt.save_edge_img steps because of computational speed
-                if result.sum() > 0 and batch_idx % self.opt.save_edge_img  == 0:
+                if result.sum() > 0 and batch_idx % self.opt.save_plot_every  == 0 and scale ==0:
 
                     fig, ax = plt.subplots(7, 1, figsize=(12, 12))
 
@@ -507,7 +511,7 @@ class Trainer:
                     ax[1].title.set_text('disp')
                     ax[1].axis('off')
 
-                    ax[2].imshow(original_attention.cpu()[batch][index_nrs_not_overlapping[attention]], cmap='cividis')
+                    ax[2].imshow(original_attention.cpu()[batch][index_nrs_not_overlapping[batch][attention]], cmap='cividis')
                     ax[2].title.set_text('Original attention mask')
                     ax[2].axis('off')
 
@@ -527,7 +531,7 @@ class Trainer:
                     ax[6].title.set_text('Edges disp after erosion')
                     ax[6].axis('off')
 
-                    fig.savefig('edge_experiment_4_3/epoch_{}batchIDX_{}scale_{}attenion_{}result_{}.png'.format(self.epoch, batch_idx, scale, attention, result.sum()/255))
+                    fig.savefig('{}/epoch_{}_batchIDX_{}_attenion_{}_result_{}_threshold_{}.png'.format(path, self.epoch, batch_idx, attention, result.sum()/255, self.opt.edge_detection_threshold))
                     plt.close()
 
 
@@ -536,8 +540,14 @@ class Trainer:
 
         edge_loss = torch.FloatTensor(edge_loss).to(self.device)
 
+        loss = torch.mean(edge_loss)/255
+
+
+        if torch.isnan(loss):
+            loss = 0
+
         # divide by 255 because 1 pixels should have value 1 not 255
-        return torch.mean(edge_loss)/255
+        return loss
 
 
     def attention_depth_loss(self, scale, outputs, inputs):
@@ -772,7 +782,7 @@ class Trainer:
         """
 
         # because once in the 250 steps you want to plot an edge loss
-        if batch_idx % self.opt.save_edge_img == 0:
+        if batch_idx % self.opt.save_plot_every == 0:
             original_masks = torch.clone(inputs['attention'])
         else:
             original_masks = None
@@ -784,10 +794,9 @@ class Trainer:
         # first determine if you need to calculate the attention mask loss. Then you only have to do this once.
         # this is indepenedned of the scale or frame id.
         if self.opt.attention_mask_loss == True:
-            start = time.time()
-            attention_weight = attention_mask_weight(self, inputs, batch_idx, edge=False).to(self.device)
-            duration = time.time() - start
-            # print("DURR", duration)
+
+            attention_weight = attention_mask_weight(self, inputs, batch_idx, original_masks, edge=False).to(self.device)
+
         else:
             attention_weight = torch.ones(size = (self.opt.batch_size, 1, self.opt.height, self.opt.width)).to(self.device)
             # print("ONES", attention_weight.shape)
@@ -798,7 +807,7 @@ class Trainer:
         if self.opt.edge_loss == True:
             # first determine which masks over overlapping.
             # because you don't want overlapping masks for edge detection because you might find the same edge multiple times
-            not_overlapping_attention_masks, index_numbers_not_overlapping = attention_mask_weight(self, inputs, batch_idx, edge=True)
+            not_overlapping_attention_masks, index_numbers_not_overlapping = overlapping_masks_edge_detection(self, inputs, batch_idx, original_masks)
 
 
 
@@ -834,6 +843,8 @@ class Trainer:
                 # start = time.time()
                 edge_loss = self.edge_detection_loss(scale, outputs, inputs, not_overlapping_attention_masks, batch_idx, index_numbers_not_overlapping, original_masks)
                 # print("edge loss", self.opt.edge_weight * edge_loss / (2 ** scale))
+
+                print("EDGE LOSS", self.opt.edge_weight * edge_loss / (2 ** scale))
                 loss += self.opt.edge_weight * edge_loss / (2 ** scale)
 
                 # duration = time.time() - start
@@ -882,8 +893,8 @@ class Trainer:
             if not self.opt.disable_automasking:
                 # add random numbers to break ties
                 identity_reprojection_loss += torch.randn(
-                    # identity_reprojection_loss.shape).cuda() * 0.00001
-                    identity_reprojection_loss.shape).cpu() * 0.00001
+                    identity_reprojection_loss.shape).to('cuda' if torch.cuda.is_available() else 'cpu') * 0.00001
+
 
                 combined = torch.cat((identity_reprojection_loss, reprojection_loss), dim=1)
             else:

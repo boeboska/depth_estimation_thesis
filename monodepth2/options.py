@@ -266,35 +266,39 @@ class MonodepthOptions:
     def parse(self):
         self.options = self.parser.parse_args()
 
-        # based on the current threshold determine how many attention masks you want to use
-        # during training. This is based on a table where we calculated the mean amount of
-        # maps per threshold. This saves a lot of computational speed as you don't have to
-        # load all the 100 attention maps to your gpu per image but only a small amount
-
-        threshold = self.options.attention_threshold
-
-        amount_of_masks = {
-            0.9: 12,
-            0.8: 15,
-            0.7: 18,
-            0.6: 23,
-            0.5: 30,
-            0.4: 35,
-            0.3: 40,
-            0.2: 50
-        }
-
-        mask_amount = amount_of_masks[threshold]
-
-        print("MASK AMOUNT", mask_amount)
-
-        self.parser.add_argument("--mask_amount",
-                                 help="amount of masks during training. dependend of the attention threshold."
-                                      "This saves a lot of computational speed",
-                                 default=mask_amount)
-
-        self.options = self.parser.parse_args()
-
         return self.options
 
+
+
+
+        # print("###################")
+        #
+        # # based on the current threshold determine how many attention masks you want to use
+        # # during training. This is based on a table where we calculated the mean amount of
+        # # maps per threshold. This saves a lot of computational speed as you don't have to
+        # # load all the 100 attention maps to your gpu per image but only a small amount
+        #
+        # threshold = self.options.attention_threshold
+        #
+        # amount_of_masks = {
+        #     0.9: 12,
+        #     0.8: 15,
+        #     0.7: 18,
+        #     0.6: 23,
+        #     0.5: 30,
+        #     0.4: 35,
+        #     0.3: 40,
+        #     0.2: 50
+        # }
+        #
+        # mask_amount = amount_of_masks[threshold]
+        #
+        # print("MASK AMOUNT", mask_amount)
+        #
+        # self.parser.add_argument("--mask_amount",
+        #                          help="amount of masks during training. dependend of the attention threshold."
+        #                               "This saves a lot of computational speed",
+        #                          default=mask_amount)
+
+        # self.options = self.parser.parse_args()
 

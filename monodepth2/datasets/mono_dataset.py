@@ -46,7 +46,6 @@ class MonoDataset(data.Dataset):
         img_ext
     """
     def __init__(self,
-                 mask_amount,
                  attention_mask_loss,
                  edge_loss,
                  data_path,
@@ -61,7 +60,6 @@ class MonoDataset(data.Dataset):
                  img_ext='.jpg',):
         super(MonoDataset, self).__init__()
 
-        self.mask_amount = mask_amount
         self.attention_mask_loss = attention_mask_loss
         self.edge_loss = edge_loss
         self.attention_threshold = attention_threshold
@@ -80,6 +78,20 @@ class MonoDataset(data.Dataset):
         self.loader = pil_loader
         self.attention_loader = pil_loader_attention
         self.to_tensor = transforms.ToTensor()
+
+        amount_of_masks = {
+            0.9: 12,
+            0.8: 15,
+            0.7: 18,
+            0.6: 23,
+            0.5: 30,
+            0.4: 35,
+            0.3: 40,
+            0.2: 50
+        }
+
+        mask_amount = amount_of_masks[self.attention_threshold]
+
 
         # We need to specify augmentations differently in newer versions of torchvision.
         # We first try the newer tuple version; if this fails we fall back to scalars
@@ -195,11 +207,11 @@ class MonoDataset(data.Dataset):
                         attention_list = []
                         loop_count = 0
 
-                        a = torch.empty(self.mask_amount, self.height, self.width)
+                        a = torch.empty(mask_amount, self.height, self.width)
                         for key, value in attention_masks.items():
 
                             # if you have loaded in the maximum amount of masks for this threshold
-                            if loop_count > self.mask_amount -1:
+                            if loop_count > mask_amount -1:
                                 break
 
                             # check if prob from attention masks is high enough for threshold
