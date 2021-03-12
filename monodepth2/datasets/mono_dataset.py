@@ -90,7 +90,7 @@ class MonoDataset(data.Dataset):
             0.2: 50
         }
 
-        mask_amount = amount_of_masks[self.attention_threshold]
+        self.mask_amount = amount_of_masks[self.attention_threshold]
 
 
         # We need to specify augmentations differently in newer versions of torchvision.
@@ -207,11 +207,11 @@ class MonoDataset(data.Dataset):
                         attention_list = []
                         loop_count = 0
 
-                        a = torch.empty(mask_amount, self.height, self.width)
+                        a = torch.empty(self.mask_amount, self.height, self.width)
                         for key, value in attention_masks.items():
 
                             # if you have loaded in the maximum amount of masks for this threshold
-                            if loop_count > mask_amount -1:
+                            if loop_count > self.mask_amount -1:
                                 break
 
                             # check if prob from attention masks is high enough for threshold
