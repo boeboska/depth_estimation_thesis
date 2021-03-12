@@ -46,6 +46,7 @@ class MonoDataset(data.Dataset):
         img_ext
     """
     def __init__(self,
+                 mask_amount,
                  attention_mask_loss,
                  edge_loss,
                  data_path,
@@ -60,6 +61,7 @@ class MonoDataset(data.Dataset):
                  img_ext='.jpg',):
         super(MonoDataset, self).__init__()
 
+        self.mask_amount = mask_amount
         self.attention_mask_loss = attention_mask_loss
         self.edge_loss = edge_loss
         self.attention_threshold = attention_threshold
@@ -173,7 +175,7 @@ class MonoDataset(data.Dataset):
 
         # print("hidde", self.frame_idxs)
         for i in self.frame_idxs:
-            # print("ii", i)
+
             if i == "s":
                 other_side = {"r": "l", "l": "r"}[side]
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index, other_side, do_flip)
@@ -193,34 +195,22 @@ class MonoDataset(data.Dataset):
                         attention_list = []
                         loop_count = 0
 
-                        a = torch.empty(30, self.height, self.width)
+                        a = torch.empty(self.mask_amount, self.height, self.width)
                         for key, value in attention_masks.items():
 
-                            if loop_count > 29:
+                            # if you have loaded in the maximum amount of masks for this threshold
+                            if loop_count > self.mask_amount -1:
                                 break
 
-                            # if attention prob is high enough add to inputs
-
-                            # if float(key.split("_")[1].split("jpg")[0][:-1]) >= self.attention_threshold:
-                            #     count +=1
-
-
+                            # check if prob from attention masks is high enough for threshold
                             if float(key.split("_")[1].split("jpg")[0][:-1]) >= self.attention_threshold:
                                 value = transforms.ToTensor()(value)
                                 a[loop_count] = value
-                                # print(value.mean())
+
                                 loop_count += 1
-                                # print("loop count", loop_count)
-
-
 
                         inputs[("attention")] = a
-                        # inputs[("test")] = [1, 2, 3]
 
-
-
-                                # print("inputs len", len(inputs))
-        # print("@@@")
 
         # adjusting intrinsics to match each scale in the pyramid
         for scale in range(self.num_scales):

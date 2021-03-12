@@ -8,6 +8,8 @@ from __future__ import absolute_import, division, print_function
 
 import os
 import argparse
+import seaborn as sns; sns.set_theme()
+import seaborn as sns
 
 file_dir = os.path.dirname(__file__)  # the directory that options.py resides in
 
@@ -36,14 +38,36 @@ class MonodepthOptions:
                                  type=float,
                                  help="how accurate the attention maps should be",
                                  default = 0.5)
+        self.parser.add_argument("--save_plot_every",
+                                 type=int,
+                                 help="how often to save edge loss or additional weight loss images during training",
+                                 default=1)
+
+        self.parser.add_argument("--weight_attention_matrix",
+                                 type=float,
+                                 help="A weight to multiply to the attention masks weights. This to make sure the weight "
+                                      "doesn't get to big",
+                                 default=0.7)
+        self.parser.add_argument("--edge_detection_threshold",
+                                 type=float,
+                                 help="The threshold used for canny edge detection. The lower the number the easier it will find edges",
+                                 default=0.2)
+
+
         self.parser.add_argument("--attention_weight",
                                  type=float,
                                  help="attention depth weight",
                                  default=1e-3)
+        self.parser.add_argument("--edge_weight",
+                                 type=float,
+                                 help="attention depth weight",
+                                 default=1e-7)
         self.parser.add_argument("--attention_sum",
                                  type = int,
                                  help = "threshold of how big the attention mask may be during training",
                                  default = 12500)
+
+
 
         # PATHS
         self.parser.add_argument("--data_path",
@@ -54,7 +78,7 @@ class MonodepthOptions:
         self.parser.add_argument("--log_dir",
                                  type=str,
                                  help="log directory",
-                                 default="../../monodepth_models/")
+                                 default="monodepth_models/")
                                  # default=os.path.join(os.path.expanduser("~"), "tmp"))
 
         # TRAINING options
@@ -118,7 +142,7 @@ class MonodepthOptions:
         self.parser.add_argument("--batch_size",
                                  type=int,
                                  help="batch size",
-                                 default=2)
+                                 default=1)
         self.parser.add_argument("--learning_rate",
                                  type=float,
                                  help="learning rate",
@@ -171,7 +195,7 @@ class MonodepthOptions:
         self.parser.add_argument("--num_workers",
                                  type=int,
                                  help="number of dataloader workers",
-                                 default=6)
+                                 default=1)
 
         # LOADING options
         self.parser.add_argument("--load_weights_folder",
@@ -187,11 +211,11 @@ class MonodepthOptions:
         self.parser.add_argument("--log_frequency",
                                  type=int,
                                  help="number of batches between each tensorboard log",
-                                 default=250)
+                                 default=10)
         self.parser.add_argument("--save_frequency",
                                  type=int,
                                  help="number of epochs between each save",
-                                 default=1)
+                                 default=25)
 
         # EVALUATION options
         self.parser.add_argument("--eval_stereo",
@@ -234,6 +258,43 @@ class MonodepthOptions:
                                       "from the original monodepth paper",
                                  action="store_true")
 
+    # def parse(self):
+    #     self.options = self.parser.parse_args()
+    #     return self.options
+
+
     def parse(self):
         self.options = self.parser.parse_args()
+
+        # based on the current threshold determine how many attention masks you want to use
+        # during training. This is based on a table where we calculated the mean amount of
+        # maps per threshold. This saves a lot of computational speed as you don't have to
+        # load all the 100 attention maps to your gpu per image but only a small amount
+
+        threshold = self.options.attention_threshold
+
+        amount_of_masks = {
+            0.9: 12,
+            0.8: 15,
+            0.7: 18,
+            0.6: 23,
+            0.5: 30,
+            0.4: 35,
+            0.3: 40,
+            0.2: 50
+        }
+
+        mask_amount = amount_of_masks[threshold]
+
+        print("MASK AMOUNT", mask_amount)
+
+        self.parser.add_argument("--mask_amount",
+                                 help="amount of masks during training. dependend of the attention threshold."
+                                      "This saves a lot of computational speed",
+                                 default=mask_amount)
+
+        self.options = self.parser.parse_args()
+
         return self.options
+
+
