@@ -46,6 +46,7 @@ torch.backends.cudnn.enabled = False
 
 torch.cuda.empty_cache()
 
+
 import os
 
 # os.environ["KMP_DUPLICATE_LIB_OK"]= True
@@ -227,6 +228,11 @@ class Trainer:
         self.epoch = 0
         self.step = 0
         self.start_time = time.time()
+
+        # text_file = open("progress_during_training.txt", "w")
+
+
+
         for self.epoch in range(self.opt.num_epochs):
             self.run_epoch()
             if (self.epoch + 1) % self.opt.save_frequency == 0:
@@ -243,13 +249,6 @@ class Trainer:
         prob_sum_mask = {}
 
         for batch_idx, inputs in enumerate(self.train_loader):
-            print("idx", batch_idx)
-
-            if batch_idx % 1500 == 0:
-                self.save_model(batch_idx)
-
-
-
 
             before_op_time = time.time()
 
@@ -416,6 +415,8 @@ class Trainer:
 
         original_img = inputs["color_aug", 0, 0]
 
+
+
         original_img = original_img.view(self.opt.height * self.opt.batch_size, self.opt.width, 3)
         # depth_mask = depth_mask.view(self.opt.height * self.opt.batch_size, self.opt.width, 3)
 
@@ -464,10 +465,8 @@ class Trainer:
 
         edge_loss = []
 
-        # threshold for edge detection
-
         # set this on if you want to double check if the tensors are not overlapping.
-        self.additional_not_overlapping_check(attention_mask)
+        # self.additional_not_overlapping_check(attention_mask)
 
         attention_mask = torch.clone(attention_mask).to(self.device)
 
@@ -482,19 +481,13 @@ class Trainer:
         disp = F.interpolate(
             disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
 
-        # create only the depth pixels that lie inside the attention mask
-
-        # disp [2, 1, 192, 640]
-
-        # depth mask [2, 1, 192,640
-
         # sum all the attention mask together in 1 attention tensor for faster computation. This is possible because there are not overlalping maps # attention_mask [2, 1, 192, 640]
         attention_mask = attention_mask.sum(1).unsqueeze(1)
 
-        # breakpoint()
+
         assert attention_mask.max() == 1, "sum of attention masks is greater than one .. probably overlapping masks"
 
-
+        # create only the depth pixels that lie inside the attention mask
         depth_mask = (attention_mask * disp).squeeze(0).squeeze(0)
 
         # breakpoint()
@@ -512,8 +505,8 @@ class Trainer:
         depth_mask = np.uint8(depth_mask)
 
         # # prepare images for plotting
-        # if batch_idx % self.opt.save_plot_every == 0 and scale == 0:
-        disp_min, disp_max, original_img, disp, path, attention_mask = self.prepare_edge_plot(disp, inputs, attention_mask)
+        if batch_idx % self.opt.save_plot_every == 0 and scale == 0:
+            disp_min, disp_max, original_img, disp, path, attention_mask = self.prepare_edge_plot(disp, inputs, attention_mask)
 
 
         edges_disp = cv2.Canny(depth_mask, self.opt.edge_detection_threshold * 255, self.opt.edge_detection_threshold * 255, apertureSize=3, L2gradient=False)
@@ -521,47 +514,55 @@ class Trainer:
         erosion = cv2.erode(depth_mask, kernel, iterations=3)
         result = cv2.bitwise_and(edges_disp, edges_disp, mask=erosion)
 
-        # if you found an edge and save the image. only once in the self.opt.save_edge_img steps because of computational speed
-        # if result.sum() > 0 and batch_idx % self.opt.save_plot_every  == 0 and scale ==0:
 
-        # fig, ax = plt.subplots(7, 1, figsize=(12, 12))
-        #
-        # # breakpoint()
-        # # 2, 192, 640, 3
-        # ax[0].imshow(original_img)
-        # ax[0].title.set_text('Original image')
-        # ax[0].axis('off')
-        # #
-        # # # 2, 192, 640
-        # ax[1].imshow(disp)
-        # ax[1].title.set_text('disp')
-        # ax[1].axis('off')
-        #
-        # # ax[2].imshow(original_attention.cpu()[batch][index_nrs_not_overlapping[batch][attention]], cmap='cividis')
-        # # ax[2].title.set_text('Original attention mask')
-        # # ax[2].axis('off')
-        #
-        # # #2, 1, 192, 640
-        # ax[3].imshow(attention_mask.cpu(), cmap='cividis')
-        # ax[3].title.set_text('Casted attention mask')
-        # ax[3].axis('off')
-        #
-        # ax[4].imshow(depth_mask, vmin =disp_min, vmax=disp_max)
-        # ax[4].title.set_text('depth mask')
-        # ax[4].axis('off')
-        #
-        # ax[5].imshow(edges_disp)
-        # ax[5].title.set_text('Edges disp before erosion')
-        # ax[5].axis('off')
-        #
-        # ax[6].imshow(result)
-        # ax[6].title.set_text('Edges disp after erosion')
-        # ax[6].axis('off')
-        #
-        # # plt.show()
-        #
-        # fig.savefig('{}/epoch_{}_batchIDX_{}_result_{}_threshold_{}.png'.format(path, self.epoch, batch_idx, result.sum()/255, self.opt.edge_detection_threshold))
-        # plt.close()
+        for b in range(self.opt.batch_size -1):
+
+            # remove edges between the stacked images borders
+            number = (b + 1) * (self.opt.height)
+            result[number] = 0
+            result[number -1] = 0
+
+
+        # if you found an edge and save the image. only once in the self.opt.save_edge_img steps because of computational speed
+        if result.sum() > 0 and batch_idx % self.opt.save_plot_every  == 0 and scale ==0:
+
+            fig, ax = plt.subplots(6, 1, figsize=(12, 12))
+
+            # 2, 192, 640, 3
+            ax[0].imshow(original_img)
+            ax[0].title.set_text('Original image')
+            ax[0].axis('off')
+            #
+            # # 2, 192, 640
+            ax[1].imshow(disp)
+            ax[1].title.set_text('disp')
+            ax[1].axis('off')
+
+            # ax[2].imshow(original_attention.cpu()[batch][index_nrs_not_overlapping[batch][attention]], cmap='cividis')
+            # ax[2].title.set_text('Original attention mask')
+            # ax[2].axis('off')
+
+            # # #2, 1, 192, 640
+            ax[2].imshow(attention_mask.cpu(), cmap='cividis')
+            ax[2].title.set_text('Casted attention mask')
+            ax[2].axis('off')
+
+            ax[3].imshow(depth_mask, vmin =disp_min, vmax=disp_max)
+            ax[3].title.set_text('depth mask')
+            ax[3].axis('off')
+
+            ax[4].imshow(edges_disp)
+            ax[4].title.set_text('Edges disp before erosion')
+            ax[4].axis('off')
+
+            ax[5].imshow(result)
+            ax[5].title.set_text('Edges disp after erosion')
+            ax[5].axis('off')
+
+            # plt.show()
+
+            fig.savefig('{}/epoch_{}_batchIDX_{}_result_{}_threshold_{}.png'.format(path, self.epoch, batch_idx, result.sum()/255, self.opt.edge_detection_threshold))
+            plt.close()
 
 
         if result.sum() > 0:
@@ -569,13 +570,14 @@ class Trainer:
 
         edge_loss = torch.FloatTensor(edge_loss).to(self.device)
 
+
+        # divide by 255 because 1 pixels should have value 1 not 255
         loss = torch.mean(edge_loss)/255
 
 
         if torch.isnan(loss):
             loss = 0
 
-        # divide by 255 because 1 pixels should have value 1 not 255
         return loss
 
 
@@ -811,7 +813,7 @@ class Trainer:
         """
 
         # because once in the 250 steps you want to plot an edge loss
-        if batch_idx % self.opt.save_plot_every == 0:
+        if batch_idx % self.opt.save_plot_every == 0 and self.opt.edge_loss or self.opt.attention_mask_loss:
             original_masks = torch.clone(inputs['attention'])
         else:
             original_masks = None
@@ -868,7 +870,7 @@ class Trainer:
                 start = time.time()
                 reprojection_losses.append(self.compute_reprojection_loss(pred, target, inputs, attention_weight))
                 duration = time.time() - start
-                print("DURATION reprojection", duration)
+                # print("DURATION reprojection", duration)
 
             reprojection_losses = torch.cat(reprojection_losses, 1)
 
@@ -882,7 +884,7 @@ class Trainer:
                 loss += self.opt.edge_weight * edge_loss / (2 ** scale)
 
                 duration = time.time() - start
-                print("DURATION edge", duration)
+                # print("DURATION edge", duration)
 
 
             # TRUE
@@ -1026,6 +1028,14 @@ class Trainer:
             " | loss: {:.5f} | time elapsed: {} | time left: {}"
         print(print_string.format(self.epoch, batch_idx, samples_per_sec, loss,
                                   sec_to_hm_str(time_sofar), sec_to_hm_str(training_time_left)))
+
+
+        print_string = ("epoch {:>3} | batch {:>6} | examples/s: {:5.1f}" + \
+            " | loss: {:.5f} | time elapsed: {} | time left: {}").format(self.epoch, batch_idx, samples_per_sec, loss,
+                                  sec_to_hm_str(time_sofar), sec_to_hm_str(training_time_left))
+        with open("output_during_training.txt", "a") as text_file:
+            text_file.write( print_string + "\n")
+
 
     def log(self, mode, inputs, outputs, losses):
         """Write an event to the tensorboard events file

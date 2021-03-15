@@ -19,6 +19,7 @@ def select_non_zero_attention_masks(attention_masks):
     # for determening the weight per attention mask
     size_attention_masks_all_batches = {}
     size_per_batch = {}
+
     for b in range(attention_masks.shape[0]):
         amount_attention_masks[b] = None
 
@@ -223,7 +224,7 @@ def check_if_weight_is_applied_correctly(weight_per_mask, weight_assert):
 def overlapping_masks_edge_detection(self, inputs, batch_idx, original_attention_masks):
 
     # retrieve the attention masks which belong to the target frame
-    attention_masks = inputs['attention']
+    attention_masks = inputs['attention'].to(self.device)
 
     # only keep the pixels which belong to the mask en reduce noise from the mask image
     attention_masks[attention_masks >= 0.8] = 1
@@ -278,7 +279,6 @@ def find_not_overlapping_masks_for_edge_detection(self, inputs, attention_masks,
             if str(value) != 'inf':
                 all_masks_loop_list.append(key)
 
-
         not_overlapping_masks = []
 
         # while there are still masks not checked if they over overlapping
@@ -309,7 +309,7 @@ def find_not_overlapping_masks_for_edge_detection(self, inputs, attention_masks,
 
         all_not_overlapping_masks.append(not_overlapping_masks)
 
-        return batch_masks, all_not_overlapping_masks
+    return batch_masks, all_not_overlapping_masks
 
 
 def attention_mask_weight(self, inputs, batch_idx, original_attention_masks, edge=False):

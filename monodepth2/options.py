@@ -41,7 +41,7 @@ class MonodepthOptions:
         self.parser.add_argument("--save_plot_every",
                                  type=int,
                                  help="how often to save edge loss or additional weight loss images during training",
-                                 default=1)
+                                 default=10000)
 
         self.parser.add_argument("--weight_attention_matrix",
                                  type=float,
@@ -66,8 +66,6 @@ class MonodepthOptions:
                                  type = int,
                                  help = "threshold of how big the attention mask may be during training",
                                  default = 12500)
-
-
 
         # PATHS
         self.parser.add_argument("--data_path",
@@ -142,7 +140,7 @@ class MonodepthOptions:
         self.parser.add_argument("--batch_size",
                                  type=int,
                                  help="batch size",
-                                 default=2)
+                                 default=1)
         self.parser.add_argument("--learning_rate",
                                  type=float,
                                  help="learning rate",
@@ -211,7 +209,7 @@ class MonodepthOptions:
         self.parser.add_argument("--log_frequency",
                                  type=int,
                                  help="number of batches between each tensorboard log",
-                                 default=10)
+                                 default=250)
         self.parser.add_argument("--save_frequency",
                                  type=int,
                                  help="number of epochs between each save",
