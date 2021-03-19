@@ -231,8 +231,6 @@ class Trainer:
 
         # text_file = open("progress_during_training.txt", "w")
 
-
-
         for self.epoch in range(self.opt.num_epochs):
             self.run_epoch()
             if (self.epoch + 1) % self.opt.save_frequency == 0:
@@ -250,10 +248,13 @@ class Trainer:
 
         for batch_idx, inputs in enumerate(self.train_loader):
 
+            if batch_idx % 25 == 0:
+                print(batch_idx)
+
             before_op_time = time.time()
 
             outputs, losses = self.process_batch(inputs, batch_idx)
-            # breakpoint()
+
             self.model_optimizer.zero_grad()
 
             losses["loss"].backward()
@@ -275,6 +276,10 @@ class Trainer:
                 self.val(batch_idx)
 
             self.step += 1
+
+
+            # duration = time.time() - start
+            # print("DUR ", duration)
 
     def process_batch(self, inputs, batch_idx):
         """Pass a minibatch through the network and generate images and losses
@@ -479,22 +484,22 @@ class Trainer:
 
         # upsample to kitti size for correct multiplication with attention_mask
         disp = F.interpolate(
-            disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
+            disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False).to(self.device)
 
         # sum all the attention mask together in 1 attention tensor for faster computation. This is possible because there are not overlalping maps # attention_mask [2, 1, 192, 640]
-        attention_mask = attention_mask.sum(1).unsqueeze(1)
+        attention_mask = attention_mask.sum(1).unsqueeze(1).to(self.device)
 
 
         assert attention_mask.max() == 1, "sum of attention masks is greater than one .. probably overlapping masks"
 
         # create only the depth pixels that lie inside the attention mask
-        depth_mask = (attention_mask * disp).squeeze(0).squeeze(0)
+        depth_mask = (attention_mask * disp).squeeze(0).squeeze(0).to(self.device)
 
         # breakpoint()
         if self.opt.batch_size > 1:
 
             # 1, 1 192 * batch_size , 640. so paste the images under eachother such that you only have to do edge detection once
-            depth_mask = depth_mask.view(self.opt.height * self.opt.batch_size, self.opt.width)
+            depth_mask = depth_mask.view(self.opt.height * self.opt.batch_size, self.opt.width).to(self.device)
 
         depth_mask = np.array(depth_mask.cpu().detach().numpy())
 
@@ -801,10 +806,9 @@ class Trainer:
         else:
         # is attention_mask_loss is false, attention_weight is just a torch.ones in the size of SSIM. So it is not applied.
             ssim_loss = self.ssim(pred, target).mean(1, True)
-            # print("SSIM SHAPE", ssim_loss.shape)
+
 
             reprojection_loss = 0.85 * ssim_loss *  attention_weight + 0.15 * l1_loss * attention_weight
-
 
         return reprojection_loss
 
@@ -844,6 +848,8 @@ class Trainer:
 
         # self.opt.scales = # help = "scales used in the loss", # default = [0, 1, 2, 3])
         for scale in self.opt.scales:
+            # print("HGFDS")
+            # 1/0
             # print("scale", scale)
             loss = 0
             reprojection_losses = []
@@ -1033,8 +1039,20 @@ class Trainer:
         print_string = ("epoch {:>3} | batch {:>6} | examples/s: {:5.1f}" + \
             " | loss: {:.5f} | time elapsed: {} | time left: {}").format(self.epoch, batch_idx, samples_per_sec, loss,
                                   sec_to_hm_str(time_sofar), sec_to_hm_str(training_time_left))
-        with open("output_during_training.txt", "a") as text_file:
-            text_file.write( print_string + "\n")
+        current_log = [item.replace('\n', '') for item in open('output_during_training.txt').readlines()]
+        current_log.append(print_string)
+
+        with open('output_during_training.txt', 'w') as file:
+            file.write('\n'.join(current_log))
+        i / 0
+        # with open('output_during_training.txt', 'r') as file:
+        #     content = file
+        #     print('content', content)
+            # content = '\n'.join(file.readlines())
+            # file.write(content + '\n' + print_string)
+
+        # with open("output_during_training.txt", "w") as text_file:
+        #     text_file.write( print_string + "\n")
 
 
     def log(self, mode, inputs, outputs, losses):

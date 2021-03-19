@@ -41,7 +41,7 @@ class MonodepthOptions:
         self.parser.add_argument("--save_plot_every",
                                  type=int,
                                  help="how often to save edge loss or additional weight loss images during training",
-                                 default=10000)
+                                 default=1)
 
         self.parser.add_argument("--weight_attention_matrix",
                                  type=float,
@@ -209,11 +209,11 @@ class MonodepthOptions:
         self.parser.add_argument("--log_frequency",
                                  type=int,
                                  help="number of batches between each tensorboard log",
-                                 default=250)
+                                 default=100)
         self.parser.add_argument("--save_frequency",
                                  type=int,
                                  help="number of epochs between each save",
-                                 default=25)
+                                 default=250)
 
         # EVALUATION options
         self.parser.add_argument("--eval_stereo",

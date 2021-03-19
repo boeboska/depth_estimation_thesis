@@ -136,13 +136,20 @@ def plot_attention_weight_loss_matrix(self, inputs, not_overlapping_masks, atten
 
 
     path = self.opt.log_dir + self.opt.model_name + "/" + "weight_matrix_img/"
-    print("PATHH", path)
     if not os.path.exists(path):
         os.makedirs(path)
 
+
     # select the rgb kitti image
-    original_img = inputs["color_aug", 0, 0]
+    # select only the first batch
+    original_img = inputs["color_aug", 0, 0][0]
     original_img = np.array(original_img.cpu().detach().numpy())
+
+    original_img = np.swapaxes(original_img, 0, 1)
+    original_img = np.swapaxes(original_img, 1, 2)
+    #
+    # breakpoint()
+
 
     plot_list = []
     for mask in range(len(not_overlapping_masks)):
@@ -160,7 +167,8 @@ def plot_attention_weight_loss_matrix(self, inputs, not_overlapping_masks, atten
     # set the super negative values to zero for correct plotting
     attention_masks[attention_masks < 0.8] = 0
 
-    for heat_mask in weight_per_mask:
+    # breakpoint()
+    for heat_mask in weight_per_mask[0]:
 
         fig, axis = plt.subplots(1, 2, figsize=(40, 5))
 
@@ -168,9 +176,7 @@ def plot_attention_weight_loss_matrix(self, inputs, not_overlapping_masks, atten
         sns.heatmap(heat_mask.squeeze(0), ax=axis[0], vmin=1, vmax=1.2, cmap='Greens', center=1)
 
         # put the original rgb kitti image in the subplot
-        axis[1].imshow(original_img[0][1])
-
-
+        axis[1].imshow(original_img)
 
     fig.savefig('{}/epoch_{}_batch_idx_{}_p1.png'.format(path, self.epoch, batch_idx))
     plt.close(fig)
@@ -211,11 +217,14 @@ def check_if_weight_is_applied_correctly(weight_per_mask, weight_assert):
             weights_in_tensor = weight_per_mask[b][mask][weight_per_mask[b][mask] != 1.].unique()
 
             # sum of all the unique values in the tensor. these are the additional weight values
+            # do -1 because the weights are +1
             weights_in_tensor = (weights_in_tensor - 1).sum().item()
+
 
             # round for floating overflow. weight assert are the values which should be used.
             # take the unique value in weight asser ass well because if 2 masks get same value check doesn't hold but is still works correctly
-            check = round( round(weights_in_tensor, 2) - (weight_assert.unique().sum().item()), 2)
+            check = round( round(weights_in_tensor, 2) - (weight_assert[b].unique().sum().item()), 2)
+            # print("Check", check)
 
             # check should be zero, otherwise throw the error message
             assert check == 0, "Weight are not correctly multipled. The weight different is: {}".format(check)
@@ -464,13 +473,28 @@ def determine_mask_weight(self, attention_masks):
     # batch x amount of attention. sum every attention tensor within the batch size. Sum per attention
     attention_sum = attention_masks.sum(-1).sum(-1)
 
+    threshold = self.opt.attention_threshold
+
+
+    # these weight are determined by looping over the whole dataset en calculating per image how many kitti images
+    # are not overlapping and then determine the avg weight based on those attention mask per kitti image
+    # this makes sure that an attention mask will always get the same weight independend of the other attention masks for
+    # that one speicific kitti image
+    avg_weight_per_threshold = {
+        0.4: 1053,
+        0.5: 980,
+        0.6: 905,
+        0.7: 818,
+        0.8: 688
+    }
 
     # divide sum per mask over the size of the kitti image
     v = attention_sum / (self.opt.width * self.opt.height)
-    print("attention sum", attention_sum)
 
 
     v = 1 / v
+
+
     # remove inf number because 1 / 0 = inf
     v[v == float('inf')] = 0
     v[v != v] = 0
@@ -479,11 +503,10 @@ def determine_mask_weight(self, attention_masks):
     # t = v.sum(-1).unsqueeze(1)
 
     # now divide the weight over the attention masks based on their size. the smaller the mask the bigger the weight
-    attention_weight_matrix = v / (self.opt.width * self.opt.height)
+    # always divide over the same number. this number is calculated by looping over the whole datasat en determinig
+    # how much weight a certain size should get indepenednet of the other object within 1 image
+    attention_weight_matrix = v / avg_weight_per_threshold[threshold]
 
-
-
-    print("WEIGHTS", attention_weight_matrix)
 
     # scale the weights by a hyper paramater. in order to not let the weight get to big.
     attention_weight_matrix = attention_weight_matrix * self.opt.weight_attention_matrix
