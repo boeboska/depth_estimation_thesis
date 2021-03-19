@@ -233,8 +233,9 @@ class Trainer:
 
         for self.epoch in range(self.opt.num_epochs):
             self.run_epoch()
-            if (self.epoch + 1) % self.opt.save_frequency == 0:
-                self.save_model(0)
+            # if (self.epoch + 1) % self.opt.save_frequency == 0:
+            self.save_model(0)
+            # print("SAVE")
 
     def run_epoch(self):
         """Run a single epoch of training and validation
@@ -248,8 +249,6 @@ class Trainer:
 
         for batch_idx, inputs in enumerate(self.train_loader):
 
-            if batch_idx % 25 == 0:
-                print(batch_idx)
 
             before_op_time = time.time()
 
@@ -302,6 +301,8 @@ class Trainer:
         else:
             # Otherwise, we only feed the image with frame_id 0 through the depth encoder
             features = self.models["encoder"](inputs["color_aug", 0, 0])
+
+            # breakpoint()
             outputs = self.models["depth"](features)
 
 
@@ -1044,7 +1045,7 @@ class Trainer:
 
         with open('output_during_training.txt', 'w') as file:
             file.write('\n'.join(current_log))
-        i / 0
+
         # with open('output_during_training.txt', 'r') as file:
         #     content = file
         #     print('content', content)
