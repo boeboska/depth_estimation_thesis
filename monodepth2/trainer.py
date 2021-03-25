@@ -59,6 +59,7 @@ import os
 
 # attention weight loss
 from attention_mask_loss import *
+from attention_weight_mask import *
 
 
 class Trainer:
@@ -309,6 +310,7 @@ class Trainer:
         if self.opt.predictive_mask:
             outputs["predictive_mask"] = self.models["predictive_mask"](features)
 
+        # breakpoint()
         if self.use_pose_net:
             outputs.update(self.predict_poses(inputs, features))
 
@@ -323,6 +325,7 @@ class Trainer:
         """Predict poses between input frames for monocular sequences.
         """
         outputs = {}
+
         if self.num_pose_frames == 2:
             # In this setting, we compute the pose to each source frame via a
             # separate forward pass through the pose network.
@@ -347,6 +350,8 @@ class Trainer:
                         pose_inputs = torch.cat(pose_inputs, 1)
 
                     axisangle, translation = self.models["pose"](pose_inputs)
+
+                    # breakpoint()
                     outputs[("axisangle", 0, f_i)] = axisangle
                     outputs[("translation", 0, f_i)] = translation
 
@@ -831,8 +836,9 @@ class Trainer:
         # this is indepenedned of the scale or frame id.
         if self.opt.attention_mask_loss == True:
 
-            attention_weight = attention_mask_weight(self, inputs, batch_idx, original_masks, edge=False).to(self.device)
-
+            # attention_weight = attention_mask_weight(self, inputs, batch_idx, original_masks, edge=False).to(self.device)
+            attention_weight = calculate_weight_matrix(self, inputs, batch_idx, original_masks).to(self.device)
+            # None
         else:
             attention_weight = torch.ones(size = (self.opt.batch_size, 1, self.opt.height, self.opt.width)).to(self.device)
             # print("ONES", attention_weight.shape)

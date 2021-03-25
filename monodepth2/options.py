@@ -37,11 +37,11 @@ class MonodepthOptions:
         self.parser.add_argument("--attention_threshold",
                                  type=float,
                                  help="how accurate the attention maps should be",
-                                 default = 0.5)
+                                 default = 0.7)
         self.parser.add_argument("--save_plot_every",
                                  type=int,
                                  help="how often to save edge loss or additional weight loss images during training",
-                                 default=1)
+                                 default=2000)
 
         self.parser.add_argument("--weight_attention_matrix",
                                  type=float,
