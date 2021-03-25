@@ -228,7 +228,7 @@ def calculate_weight_matrix(self, inputs, batch_idx, original_masks):
     weight_matrix = determine_not_overlapping_masks(self, weight_matrix, attention_masks, weight_per_mask).to(self.device)
 
     time_determine_not_overlap_pixel =  start - time.time()
-    if batch_idx % self.save_plot_every == 0:
+    if batch_idx % self.opt.save_plot_every == 0:
     # print("determine not overlap masks", time_determine_not_overlap_pixel)
         plot_attention_weight_loss_matrix(self, inputs, attention_masks, original_masks, weight_per_mask, batch_idx, weight_matrix)
 
@@ -343,9 +343,9 @@ def plot_attention_weight_loss_matrix(self, inputs, attention_masks, original_at
         # breakpoint()
 
             # create the heatmap
-        sns.heatmap(weight_matrix[batch_nr], ax=axis[0, 0], vmin=1, vmax=1.2, cmap='Greens', center=1)
-        sns.heatmap(weight_matrix[batch_nr], ax=axis[1, 0], vmin=1, vmax=1.05, cmap='Greens', center=1)
-        sns.heatmap(weight_matrix[batch_nr], ax=axis[1, 1], vmin=1, vmax=1.01, cmap='Greens', center=1)
+        sns.heatmap(weight_matrix[batch_nr].cpu(), ax=axis[0, 0], vmin=1, vmax=1.2, cmap='Greens', center=1)
+        sns.heatmap(weight_matrix[batch_nr].cpu(), ax=axis[1, 0], vmin=1, vmax=1.05, cmap='Greens', center=1)
+        sns.heatmap(weight_matrix[batch_nr].cpu(), ax=axis[1, 1], vmin=1, vmax=1.01, cmap='Greens', center=1)
 
         # put the original rgb kitti image in the subplot
         axis[0, 1].imshow(original_img)
