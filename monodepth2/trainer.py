@@ -64,6 +64,7 @@ from attention_weight_mask import *
 
 class Trainer:
     torch.cuda.empty_cache()
+    print("@@@@@", torch.cuda.is_available())
 
 
     def __init__(self, options):
@@ -250,6 +251,8 @@ class Trainer:
 
         for batch_idx, inputs in enumerate(self.train_loader):
 
+            print("idx", batch_idx)
+
 
             before_op_time = time.time()
 
@@ -414,6 +417,8 @@ class Trainer:
 
         path = self.opt.log_dir + self.opt.model_name + "/" + "edge_loss_img/"
 
+        # print("EDGE LOSS PATH", path)
+
 
         if not os.path.exists(path):
             os.makedirs(path)
@@ -536,6 +541,8 @@ class Trainer:
 
         # if you found an edge and save the image. only once in the self.opt.save_edge_img steps because of computational speed
         if result.sum() > 0 and batch_idx % self.opt.save_plot_every  == 0 and scale ==0:
+
+            # print("SAVEEUU")
 
             fig, ax = plt.subplots(6, 1, figsize=(12, 12))
 
@@ -889,14 +896,14 @@ class Trainer:
 
             if self.opt.edge_loss:
 
-                start = time.time()
+                # start = time.time()
                 edge_loss = self.edge_detection_loss(scale, outputs, inputs, not_overlapping_attention_masks, batch_idx, index_numbers_not_overlapping, original_masks)
                 # print("edge loss", self.opt.edge_weight * edge_loss / (2 ** scale))
 
                 # print("EDGE LOSS", self.opt.edge_weight * edge_loss / (2 ** scale))
                 loss += self.opt.edge_weight * edge_loss / (2 ** scale)
 
-                duration = time.time() - start
+                # duration = time.time() - start
                 # print("DURATION edge", duration)
 
 

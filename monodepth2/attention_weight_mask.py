@@ -148,6 +148,8 @@ def check_overlap_per_pixel(self, attention_masks):
 
     # calculate which combinations have overlap and where (which pixels)
     overlap = torch.eq(first, second).nonzero().to(self.device)
+
+
     #     for row in overlap:
     #         print(row)
     #     print(overlap)
@@ -266,6 +268,10 @@ def determine_not_overlapping_masks(self, weight_matrix, attention_masks, weight
 
     # this is a tensor telling which mask have no overlap with other masks. so they can add their weight to the matrix without avg, min , max, etc
     overlapping = torch.eq(first, second).to(self.device)
+
+    # breakpoint()
+
+
 
     for batch in range(overlapping.shape[0]):
         for overlap_mask in range(overlapping.shape[1]):
