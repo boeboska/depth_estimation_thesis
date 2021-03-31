@@ -75,7 +75,7 @@ device = "cuda"
 torch.cuda.empty_cache()
 
 # PAD AANPASSEN
-paths = os.walk('../../attention_masks_hidde')
+paths = os.walk('../data/attention_masks')
 
 methods = ['avg', 'min', 'max']
 thresholds = [0.5, 0.6, 0.7, 0.8]
@@ -90,7 +90,7 @@ for threshold in thresholds:
                 print(i)
 
             # voor deze kitti plaatjes heb je al de weight mask berekend
-            weight_path = path.replace("attention_masks_hidde", "weight_mask")
+            weight_path = path.replace("attention_masks", "weight_mask")
 
             # open the attention masks per kitti image
             if len(files) == 100 and files[0].endswith('jpg'):
