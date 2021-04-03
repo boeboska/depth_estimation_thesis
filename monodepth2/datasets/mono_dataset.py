@@ -6,6 +6,8 @@
 
 from __future__ import absolute_import, division, print_function
 
+
+
 import os
 import random
 import numpy as np
@@ -46,6 +48,8 @@ class MonoDataset(data.Dataset):
         img_ext
     """
     def __init__(self,
+                 weight_mask_method,
+                 weight_matrix_path,
                  attention_mask_loss,
                  edge_loss,
                  data_path,
@@ -60,6 +64,8 @@ class MonoDataset(data.Dataset):
                  img_ext='.jpg',):
         super(MonoDataset, self).__init__()
 
+        self.weight_mask_method = weight_mask_method
+        self.weight_matrix_path = weight_matrix_path
         self.attention_mask_loss = attention_mask_loss
         self.edge_loss = edge_loss
         self.attention_threshold = attention_threshold
@@ -195,7 +201,7 @@ class MonoDataset(data.Dataset):
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index + i, side, do_flip)
 
             # only add the attention masks for the target frame (frame 0)
-                if self.edge_loss or self.attention_mask_loss:
+                if self.edge_loss:
                     if i == 0:
 
                         # look up attention masks for target frame
@@ -223,7 +229,10 @@ class MonoDataset(data.Dataset):
 
                         inputs[("attention")] = a
 
-
+                if self.attention_mask_loss:
+                        if i == 0:
+                            weight_matrix = self.get_weight_matrix(folder, frame_index, side, do_flip)
+                            inputs[("weight_matrix")] = weight_matrix
         # adjusting intrinsics to match each scale in the pyramid
         for scale in range(self.num_scales):
             K = self.K.copy()

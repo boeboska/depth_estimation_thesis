@@ -6,6 +6,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+import torch
 import os
 import skimage.transform
 import numpy as np
@@ -49,6 +50,24 @@ class KITTIDataset(MonoDataset):
             color = color.transpose(pil.FLIP_LEFT_RIGHT)
 
         return color
+
+    def get_weight_matrix(self, folder, frame_index, side, do_flip):
+
+        frame_index_start = f"{0:010}"
+        length = len(str(frame_index))
+        frame_index_start = frame_index_start[:-length]
+        frame_index = frame_index_start + str(frame_index)
+        # print("folder", folder)
+        # print("frame index", frame_index)
+        # print("side", side)
+        path = self.weight_matrix_path + "/" + folder + "/" + "image_0{}/data/".format(self.side_map[side]) + str(
+            frame_index + "/" + 'threshold_' + str(self.attention_threshold) + '_method_' + self.weight_mask_method + '.pt')
+        print(path)
+
+        weight_matrix = torch.load(path)
+        return weight_matrix
+
+
 
     def get_attention(self, folder, frame_index, side, do_flip):
 

@@ -30,6 +30,9 @@ from IPython import embed
 
 # attention
 
+
+import matplotlib.pyplot as plt
+import seaborn as sns
 import matplotlib
 matplotlib.use('Agg')
 
@@ -168,16 +171,30 @@ class Trainer:
 
 
         train_dataset = self.dataset(
-            self.opt.attention_mask_loss,  self.opt.edge_loss, self.opt.data_path, self.opt.attention_path, self.opt.attention_threshold, train_filenames, self.opt.height, self.opt.width,
+            self.opt.weight_mask_method, self.opt.weight_matrix_path, self.opt.attention_mask_loss,  self.opt.edge_loss, self.opt.data_path, self.opt.attention_path, self.opt.attention_threshold, train_filenames, self.opt.height, self.opt.width,
             self.opt.frame_ids, 4, is_train=True, img_ext=img_ext)
+
 
         self.train_loader = DataLoader(
             train_dataset, self.opt.batch_size, True,
             num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
 
+
         val_dataset = self.dataset(
-            self.opt.attention_mask_loss, self.opt.edge_loss, self.opt.data_path, self.opt.attention_path, self.opt.attention_threshold, val_filenames, self.opt.height, self.opt.width,
-            self.opt.frame_ids, 4, is_train=False, img_ext=img_ext)
+            self.opt.weight_mask_method,
+            self.opt.weight_matrix_path,
+            self.opt.attention_mask_loss,
+            self.opt.edge_loss,
+            self.opt.data_path,
+            self.opt.attention_path,
+            self.opt.attention_threshold,
+            val_filenames,
+            self.opt.height,
+            self.opt.width,
+            self.opt.frame_ids,
+            4,
+            is_train=False,
+            img_ext=img_ext)
         self.val_loader = DataLoader(
             val_dataset, self.opt.batch_size, True,
             num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
@@ -250,6 +267,7 @@ class Trainer:
         prob_sum_mask = {}
 
         for batch_idx, inputs in enumerate(self.train_loader):
+            # breakpoint()
 
             print("idx", batch_idx)
 
@@ -808,10 +826,6 @@ class Trainer:
         abs_diff = torch.abs(target - pred)
         l1_loss = abs_diff.mean(1, True)
 
-        # print("pred", pred.shape)
-        # print("target", target.shape)
-
-
         if self.opt.no_ssim:
             reprojection_loss = l1_loss
 
@@ -820,20 +834,51 @@ class Trainer:
         # is attention_mask_loss is false, attention_weight is just a torch.ones in the size of SSIM. So it is not applied.
             ssim_loss = self.ssim(pred, target).mean(1, True)
 
-
+            # batch, 1 192, 640
             reprojection_loss = 0.85 * ssim_loss *  attention_weight + 0.15 * l1_loss * attention_weight
 
         return reprojection_loss
+
+
+    def plot_attention_masks(self, inputs, batch_idx):
+
+        path = self.opt.log_dir + self.opt.model_name + "/" + "weight_matrix_img/"
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        for b in range(self.opt.batch_size):
+            original_img = inputs["color_aug", 0, 0][b]
+
+            original_img = np.array(original_img.cpu().detach().numpy())
+
+            original_img = np.swapaxes(original_img, 0, 1)
+            original_img = np.swapaxes(original_img, 1, 2)
+
+            weight_mask = inputs['weight_matrix'][b].cpu()
+
+            fig, axis = plt.subplots(1, 2, figsize=(40, 5))
+
+            # create the heatmap
+            sns.heatmap(weight_mask, ax=axis[0], vmin=1, vmax=1.2, cmap='Greens', center=1)
+
+            # put the original rgb kitti image in the subplot
+            axis[1].imshow(original_img)
+            fig.savefig('{}/epoch_{}_batch_idx_{}_batch_{}.png'.format(path, self.epoch, batch_idx, b))
+            plt.close(fig)
+
 
     def compute_losses(self, inputs, outputs, batch_idx):
         """Compute the reprojection and smoothness losses for a minibatch
         """
 
         # because once in the 250 steps you want to plot an edge loss
-        if batch_idx % self.opt.save_plot_every == 0 and self.opt.edge_loss or self.opt.attention_mask_loss:
+        if batch_idx % self.opt.save_plot_every == 0 and self.opt.edge_loss:
             original_masks = torch.clone(inputs['attention'])
         else:
             original_masks = None
+        if batch_idx % self.opt.save_plot_every == 0 and self.opt.attention_mask_loss:
+            self.plot_attention_masks(inputs, batch_idx)
+
 
 
         losses = {}
@@ -841,10 +886,13 @@ class Trainer:
 
         # first determine if you need to calculate the attention mask loss. Then you only have to do this once.
         # this is indepenedned of the scale or frame id.
+        # batch size , 192, 640
         if self.opt.attention_mask_loss == True:
 
+            # do unsqueeze for correct multiplication with ssim , l1 loss
+            attention_weight = inputs['weight_matrix'].unsqueeze(1).to(self.device)
             # attention_weight = attention_mask_weight(self, inputs, batch_idx, original_masks, edge=False).to(self.device)
-            attention_weight = calculate_weight_matrix(self, inputs, batch_idx, original_masks).to(self.device)
+            # attention_weight = calculate_weight_matrix(self, inputs, batch_idx, original_masks).to(self.device)
             # None
         else:
             attention_weight = torch.ones(size = (self.opt.batch_size, 1, self.opt.height, self.opt.width)).to(self.device)
