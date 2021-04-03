@@ -34,6 +34,10 @@ class MonodepthOptions:
                                  type=str,
                                  help="path to the attention masks data",
                                  default="../../../attention_masks_hidde/")
+        self.parser.add_argument("--weight_matrix_path",
+                                 type=str,
+                                 help="path to the attention masks data",
+                                 default="../../../weight_mask/")
         self.parser.add_argument("--attention_threshold",
                                  type=float,
                                  help="how accurate the attention maps should be",
@@ -41,7 +45,7 @@ class MonodepthOptions:
         self.parser.add_argument("--save_plot_every",
                                  type=int,
                                  help="how often to save edge loss or additional weight loss images during training",
-                                 default=2000)
+                                 default=2500)
 
         self.parser.add_argument("--weight_attention_matrix",
                                  type=float,
@@ -52,6 +56,13 @@ class MonodepthOptions:
                                  type=float,
                                  help="The threshold used for canny edge detection. The lower the number the easier it will find edges",
                                  default=0.2)
+
+        self.parser.add_argument("--weight_mask_method",
+                                 type=str,
+                                 help="The threshold used for canny edge detection. The lower the number the easier it will find edges",
+                                 choices=["avg", "min", "max"],
+                                 default='avg')
+
 
 
         self.parser.add_argument("--attention_weight",
@@ -140,7 +151,7 @@ class MonodepthOptions:
         self.parser.add_argument("--batch_size",
                                  type=int,
                                  help="batch size",
-                                 default=1)
+                                 default=2)
         self.parser.add_argument("--learning_rate",
                                  type=float,
                                  help="learning rate",
