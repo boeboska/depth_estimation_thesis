@@ -12,6 +12,9 @@ import skimage.transform
 import numpy as np
 import PIL.Image as pil
 
+from PIL import Image  # using pillow-simd for increased speed
+
+
 from kitti_utils import generate_depth_map
 from .mono_dataset import MonoDataset
 
@@ -62,12 +65,15 @@ class KITTIDataset(MonoDataset):
         # print("side", side)
         path = self.weight_matrix_path + "/" + folder + "/" + "image_0{}/data/".format(self.side_map[side]) + str(
             frame_index + "/" + 'threshold_' + str(self.attention_threshold) + '_method_' + self.weight_mask_method + '.pt')
-        print(path)
+        # print(path)
 
         weight_matrix = torch.load(path)
 
         if do_flip:
-            weight_matrix = weight_matrix.transpose(pil.FLIP_LEFT_RIGHT)
+            # print("FLIP")
+            weight_matrix = np.fliplr(weight_matrix.numpy())
+            weight_matrix = torch.from_numpy(weight_matrix.copy())
+            # print(weight_matrix.shape)
 
         return weight_matrix
 

@@ -254,7 +254,7 @@ class Trainer:
             self.run_epoch()
             # if (self.epoch + 1) % self.opt.save_frequency == 0:
             self.save_model(0)
-            # print("SAVE")
+
 
     def run_epoch(self):
         """Run a single epoch of training and validation
@@ -876,7 +876,7 @@ class Trainer:
             original_masks = torch.clone(inputs['attention'])
         else:
             original_masks = None
-        if batch_idx % self.opt.save_plot_every == 0 and self.opt.attention_mask_loss:
+        if batch_idx % self.opt.save_plot_every == 0 and self.opt.attention_mask_loss and batch_idx != 0:
             self.plot_attention_masks(inputs, batch_idx)
 
 
