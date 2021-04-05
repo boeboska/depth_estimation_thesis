@@ -65,6 +65,10 @@ class KITTIDataset(MonoDataset):
         print(path)
 
         weight_matrix = torch.load(path)
+
+        if do_flip:
+            weight_matrix = weight_matrix.transpose(pil.FLIP_LEFT_RIGHT)
+
         return weight_matrix
 
 
