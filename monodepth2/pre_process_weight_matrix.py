@@ -73,11 +73,9 @@ def pre_process_weight_matrix():
     device = "cuda"
     torch.cuda.empty_cache()
 
-    # PAD AANPASSEN
-    paths = os.walk('../data/attention_masks')
 
     methods = ['avg', 'min', 'max']
-    thresholds = [0.5, 0.6, 0.7, 0.8]
+    thresholds = [0.4, 0.5, 0.6, 0.7, 0.8]
 
     # remove the old version
     if os.path.exists('output_during_weight_pre_process.txt'):
@@ -92,6 +90,9 @@ def pre_process_weight_matrix():
             for method in methods:
 
                 fileee.write('\n' + method)
+
+                # PAD AANPASSEN
+                paths = os.walk('../data/attention_masks')
 
                 for i, (path, directories, files) in enumerate(tqdm(paths)):
 
