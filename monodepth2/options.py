@@ -53,7 +53,7 @@ class MonodepthOptions:
 
         self.parser.add_argument("--weight_mask_method",
                                  type=str,
-                                 help="The threshold used for canny edge detection. The lower the number the easier it will find edges",
+                                 help="The type of weight mask it will load in",
                                  choices=["avg", "min", "max"],
                                  default='avg')
 

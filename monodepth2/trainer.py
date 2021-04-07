@@ -201,6 +201,7 @@ class Trainer:
         self.val_iter = iter(self.val_loader)
 
         self.writers = {}
+        # breakpoint()
         for mode in ["train", "val"]:
             self.writers[mode] = SummaryWriter(os.path.join(self.log_path, mode))
 
@@ -269,7 +270,7 @@ class Trainer:
         for batch_idx, inputs in enumerate(self.train_loader):
             # breakpoint()
 
-            print("idx", batch_idx)
+            # print("idx", batch_idx)
 
 
             before_op_time = time.time()
@@ -277,6 +278,8 @@ class Trainer:
             outputs, losses = self.process_batch(inputs, batch_idx)
 
             self.model_optimizer.zero_grad()
+
+            # breakpoint()
 
             losses["loss"].backward()
             self.model_optimizer.step()
@@ -820,9 +823,8 @@ class Trainer:
                     outputs[("color_identity", frame_id, scale)] = \
                         inputs[("color", frame_id, source_scale)]
 
-    def compute_reprojection_loss(self, pred, target, inputs, attention_weight):
-        """Computes reprojection loss between a batch of predicted and target images
-        """
+    def compute_reprojection_loss_bob(self, pred, target, inputs, attention_weight):
+
         abs_diff = torch.abs(target - pred)
         l1_loss = abs_diff.mean(1, True)
 
@@ -831,11 +833,26 @@ class Trainer:
 
 
         else:
-        # is attention_mask_loss is false, attention_weight is just a torch.ones in the size of SSIM. So it is not applied.
+            # is attention_mask_loss is false, attention_weight is just a torch.ones in the size of SSIM. So it is not applied.
             ssim_loss = self.ssim(pred, target).mean(1, True)
 
             # batch, 1 192, 640
-            reprojection_loss = 0.85 * ssim_loss *  attention_weight + 0.15 * l1_loss * attention_weight
+            reprojection_loss = 0.85 * ssim_loss * attention_weight + 0.15 * l1_loss * attention_weight
+
+        return reprojection_loss
+
+
+    def compute_reprojection_loss(self, pred, target, inputs, attention_weight):
+        """Computes reprojection loss between a batch of predicted and target images
+        """
+        abs_diff = torch.abs(target - pred)
+        l1_loss = abs_diff.mean(1, True)
+
+        if self.opt.no_ssim:
+            reprojection_loss = l1_loss
+        else:
+            ssim_loss = self.ssim(pred, target).mean(1, True)
+            reprojection_loss = 0.85 * ssim_loss + 0.15 * l1_loss
 
         return reprojection_loss
 
@@ -907,6 +924,7 @@ class Trainer:
             not_overlapping_attention_masks, index_numbers_not_overlapping = overlapping_masks_edge_detection(self, inputs, batch_idx, original_masks)
 
 
+        total_edge_loss = 0
 
         # self.opt.scales = # help = "scales used in the loss", # default = [0, 1, 2, 3])
         for scale in self.opt.scales:
@@ -915,6 +933,8 @@ class Trainer:
             # print("scale", scale)
             loss = 0
             reprojection_losses = []
+
+            # reprojection_losses_bob = []
 
             if self.opt.v1_multiscale:
                 source_scale = scale
@@ -937,10 +957,16 @@ class Trainer:
                 # print("LOSS REPRONECTION")
                 start = time.time()
                 reprojection_losses.append(self.compute_reprojection_loss(pred, target, inputs, attention_weight))
+                # reprojection_losses_bob.append(self.compute_reprojection_loss_bob(pred, target, inputs, attention_weight))
+
                 duration = time.time() - start
                 # print("DURATION reprojection", duration)
 
+            # reprojection_losses_bob = torch.cat(reprojection_losses_bob, 1)
             reprojection_losses = torch.cat(reprojection_losses, 1)
+            # diff = sum(reprojection_losses_bob).sum() - sum(reprojection_losses).sum()
+            # print("diff", diff)
+            # breakpoint()
 
             if self.opt.edge_loss:
 
@@ -951,8 +977,14 @@ class Trainer:
                 # print("EDGE LOSS", self.opt.edge_weight * edge_loss / (2 ** scale))
                 loss += self.opt.edge_weight * edge_loss / (2 ** scale)
 
-                # duration = time.time() - start
-                # print("DURATION edge", duration)
+                # print("edge loss" , self.opt.edge_weight * edge_loss / (2 ** scale))
+
+                total_edge_loss += self.opt.edge_weight * edge_loss / (2 ** scale)
+
+                # add for writing to tensorboard
+                losses["edge_loss/{}".format(scale)] = self.opt.edge_weight * edge_loss / (2 ** scale)
+
+
 
 
             # TRUE
@@ -1050,6 +1082,8 @@ class Trainer:
             total_loss += loss
             losses["loss/{}".format(scale)] = loss
 
+            losses["edge_loss_total/{}"] = total_edge_loss
+
 
         total_loss /= self.num_scales
         losses["loss"] = total_loss
@@ -1120,7 +1154,12 @@ class Trainer:
     def log(self, mode, inputs, outputs, losses):
         """Write an event to the tensorboard events file
         """
+        # print("log writer")
+        # breakpoint()
         writer = self.writers[mode]
+
+
+        # breakpoint()
         for l, v in losses.items():
             writer.add_scalar("{}".format(l), v, self.step)
 
