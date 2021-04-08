@@ -823,26 +823,7 @@ class Trainer:
                     outputs[("color_identity", frame_id, scale)] = \
                         inputs[("color", frame_id, source_scale)]
 
-    def compute_reprojection_loss_bob(self, pred, target, inputs, attention_weight):
-
-        abs_diff = torch.abs(target - pred)
-        l1_loss = abs_diff.mean(1, True)
-
-        if self.opt.no_ssim:
-            reprojection_loss = l1_loss
-
-
-        else:
-            # is attention_mask_loss is false, attention_weight is just a torch.ones in the size of SSIM. So it is not applied.
-            ssim_loss = self.ssim(pred, target).mean(1, True)
-
-            # batch, 1 192, 640
-            reprojection_loss = 0.85 * ssim_loss * attention_weight + 0.15 * l1_loss * attention_weight
-
-        return reprojection_loss
-
-
-    def compute_reprojection_loss(self, pred, target, inputs, attention_weight):
+    def compute_reprojection_loss(self, pred, target):
         """Computes reprojection loss between a batch of predicted and target images
         """
         abs_diff = torch.abs(target - pred)
@@ -907,7 +888,7 @@ class Trainer:
         if self.opt.attention_mask_loss == True:
 
             # do unsqueeze for correct multiplication with ssim , l1 loss
-            attention_weight = inputs['weight_matrix'].unsqueeze(1).to(self.device)
+            attention_weight = inputs['weight_matrix'].to(self.device)
             # attention_weight = attention_mask_weight(self, inputs, batch_idx, original_masks, edge=False).to(self.device)
             # attention_weight = calculate_weight_matrix(self, inputs, batch_idx, original_masks).to(self.device)
             # None
@@ -925,6 +906,7 @@ class Trainer:
 
 
         total_edge_loss = 0
+        total_attention_weight_loss = 0
 
         # self.opt.scales = # help = "scales used in the loss", # default = [0, 1, 2, 3])
         for scale in self.opt.scales:
@@ -956,7 +938,7 @@ class Trainer:
 
                 # print("LOSS REPRONECTION")
                 start = time.time()
-                reprojection_losses.append(self.compute_reprojection_loss(pred, target, inputs, attention_weight))
+                reprojection_losses.append(self.compute_reprojection_loss(pred, target))
                 # reprojection_losses_bob.append(self.compute_reprojection_loss_bob(pred, target, inputs, attention_weight))
 
                 duration = time.time() - start
@@ -964,6 +946,10 @@ class Trainer:
 
             # reprojection_losses_bob = torch.cat(reprojection_losses_bob, 1)
             reprojection_losses = torch.cat(reprojection_losses, 1)
+
+
+            # print("REPROJECTION LOSS", sum(reprojection_losses).sum())
+            # losses["reprojection_loss/{}".format(scale)] = reprojection_losses
             # diff = sum(reprojection_losses_bob).sum() - sum(reprojection_losses).sum()
             # print("diff", diff)
             # breakpoint()
@@ -986,23 +972,28 @@ class Trainer:
 
 
 
-
-            # TRUE
+            # this statement is performed
             if not self.opt.disable_automasking:
+                # print("ik kom hieraan")
                 identity_reprojection_losses = []
                 for frame_id in self.opt.frame_ids[1:]:
+
+                    # calculate here the reprojection error with the original source images
                     pred = inputs[("color", frame_id, source_scale)]
                     # print("ANDERE LOSS REPRONECTION")
                     identity_reprojection_losses.append(
-                        self.compute_reprojection_loss(pred, target, inputs, attention_weight))
+                        self.compute_reprojection_loss(pred, target))
 
                 identity_reprojection_losses = torch.cat(identity_reprojection_losses, 1)
+
 
                 if self.opt.avg_reprojection:
                     identity_reprojection_loss = identity_reprojection_losses.mean(1, keepdim=True)
                 else:
                     # save both images, and do min all at once below
                     identity_reprojection_loss = identity_reprojection_losses
+
+                # print("identity_reprojection_loss", sum(identity_reprojection_loss).sum())
 
 
             # FALSE
@@ -1028,22 +1019,42 @@ class Trainer:
 
             # This one is performed
             if not self.opt.disable_automasking:
+                # print("AUTOMASKING")
                 # add random numbers to break ties
                 identity_reprojection_loss += torch.randn(
                     identity_reprojection_loss.shape).to('cpu' if self.opt.no_cuda else 'cuda') * 0.00001
 
 
                 combined = torch.cat((identity_reprojection_loss, reprojection_loss), dim=1)
+
             else:
                 combined = reprojection_loss
 
+            # breakpoint()
             # FALSE
             if combined.shape[1] == 1:
                 to_optimise = combined
+
+            # take the pixelwise minimum between the reprojection error from the original imgs and the reconstructed imgs
+            # je neemt hier per pixel de min tussen de 2 reprojection lossses en identity losses
+            # het idee is dat de reprojection losses beter worden dan de identity losses
             else:
                 to_optimise, idxs = torch.min(combined, dim=1)
 
-            # This one is performed
+
+            # multiply the attention mask times the calculated per pixel loss
+            if self.opt.attention_mask_loss:
+                total_attention_weight_loss += (to_optimise * attention_weight).mean() - to_optimise.mean()
+                attention_weight_loss_scale = (to_optimise * attention_weight).mean() - to_optimise.mean()
+
+                to_optimise = to_optimise * attention_weight
+
+
+
+
+
+            # check which pixel is the minimum and check if this is greater then the identity reprojection for u mask
+            # This one is performed. create mask ims for tensorboard
             if not self.opt.disable_automasking:
                 outputs["identity_selection/{}".format(scale)] = (
                     idxs > identity_reprojection_loss.shape[1] - 1).float()
@@ -1080,11 +1091,19 @@ class Trainer:
             # print("loss na smooth", loss)
 
             total_loss += loss
+
+            # for tensorboard writing
             losses["loss/{}".format(scale)] = loss
 
-            losses["edge_loss_total/{}"] = total_edge_loss
 
 
+            losses["additional_weight_loss/{}".format(scale)] = attention_weight_loss_scale
+            losses["reprojection_loss/{}".format(scale)] = to_optimise.mean()
+
+
+
+        losses["total_additional_weight_loss"] = total_attention_weight_loss
+        losses["edge_loss_total/{}"] = total_edge_loss
         total_loss /= self.num_scales
         losses["loss"] = total_loss
         return losses
