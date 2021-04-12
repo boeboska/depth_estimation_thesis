@@ -27,8 +27,8 @@ opts = options.parse()
 
 if __name__ == "__main__":
     trainer = Trainer(opts)
-    try:
-        trainer.train()
-    except:
-        traceback.print_exc(file=file)
+    # try:
+    trainer.train()
+    # except:
+    # traceback.print_exc(file=file)
 
