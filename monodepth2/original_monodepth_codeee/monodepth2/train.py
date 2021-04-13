@@ -26,7 +26,7 @@ opts = options.parse()
 
 
 if __name__ == "__main__":
-    trainer = Trainer(opts)
+    # trainer = Trainer(opts)
     try:
         trainer.train()
     except:

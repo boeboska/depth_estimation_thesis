@@ -228,6 +228,8 @@ class Trainer:
     def process_batch(self, inputs):
         """Pass a minibatch through the network and generate images and losses
         """
+
+
         for key, ipt in inputs.items():
             inputs[key] = ipt.to(self.device)
 
@@ -243,14 +245,17 @@ class Trainer:
                 features[k] = [f[i] for f in all_features]
 
             outputs = self.models["depth"](features[0])
+
         else:
             # Otherwise, we only feed the image with frame_id 0 through the depth encoder
             features = self.models["encoder"](inputs["color_aug", 0, 0])
             outputs = self.models["depth"](features)
 
+        #FALSE
         if self.opt.predictive_mask:
             outputs["predictive_mask"] = self.models["predictive_mask"](features)
 
+        #True
         if self.use_pose_net:
             outputs.update(self.predict_poses(inputs, features))
 
@@ -287,6 +292,7 @@ class Trainer:
                         pose_inputs = torch.cat(pose_inputs, 1)
 
                     axisangle, translation = self.models["pose"](pose_inputs)
+
                     outputs[("axisangle", 0, f_i)] = axisangle
                     outputs[("translation", 0, f_i)] = translation
 
@@ -343,9 +349,13 @@ class Trainer:
         Generated images are saved into the `outputs` dictionary.
         """
         for scale in self.opt.scales:
+
             disp = outputs[("disp", scale)]
+
+            #false
             if self.opt.v1_multiscale:
                 source_scale = scale
+
             else:
                 disp = F.interpolate(
                     disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
@@ -354,6 +364,8 @@ class Trainer:
             _, depth = disp_to_depth(disp, self.opt.min_depth, self.opt.max_depth)
 
             outputs[("depth", 0, scale)] = depth
+
+            breakpoint()
 
             for i, frame_id in enumerate(self.opt.frame_ids[1:]):
 
@@ -368,11 +380,13 @@ class Trainer:
                     axisangle = outputs[("axisangle", 0, frame_id)]
                     translation = outputs[("translation", 0, frame_id)]
 
+
                     inv_depth = 1 / depth
                     mean_inv_depth = inv_depth.mean(3, True).mean(2, True)
 
                     T = transformation_from_parameters(
                         axisangle[:, 0], translation[:, 0] * mean_inv_depth[:, 0], frame_id < 0)
+
 
                 cam_points = self.backproject_depth[source_scale](
                     depth, inputs[("inv_K", source_scale)])
@@ -389,6 +403,7 @@ class Trainer:
                 if not self.opt.disable_automasking:
                     outputs[("color_identity", frame_id, scale)] = \
                         inputs[("color", frame_id, source_scale)]
+
 
     def compute_reprojection_loss(self, pred, target):
         """Computes reprojection loss between a batch of predicted and target images
@@ -428,6 +443,7 @@ class Trainer:
                 reprojection_losses.append(self.compute_reprojection_loss(pred, target))
 
             reprojection_losses = torch.cat(reprojection_losses, 1)
+            print("reprojection", reprojection_losses.mean())
 
             if not self.opt.disable_automasking:
                 identity_reprojection_losses = []
@@ -435,11 +451,15 @@ class Trainer:
                     pred = inputs[("color", frame_id, source_scale)]
                     identity_reprojection_losses.append(
                         self.compute_reprojection_loss(pred, target))
-
                 identity_reprojection_losses = torch.cat(identity_reprojection_losses, 1)
+
+                print("identity", identity_reprojection_losses.mean())
+                print("-----------")
 
                 if self.opt.avg_reprojection:
                     identity_reprojection_loss = identity_reprojection_losses.mean(1, keepdim=True)
+
+
                 else:
                     # save both images, and do min all at once below
                     identity_reprojection_loss = identity_reprojection_losses
@@ -469,6 +489,8 @@ class Trainer:
                     # identity_reprojection_loss.shape).cuda() * 0.00001
                     identity_reprojection_loss.shape).to('cpu' if self.opt.no_cuda else 'cuda') * 0.00001
 
+
+                # breakpoint()
                 combined = torch.cat((identity_reprojection_loss, reprojection_loss), dim=1)
             else:
                 combined = reprojection_loss
@@ -494,6 +516,9 @@ class Trainer:
 
         total_loss /= self.num_scales
         losses["loss"] = total_loss
+
+        # breakpoint()
+        # breakpoint()
         return losses
 
     def compute_depth_losses(self, inputs, outputs, losses):
@@ -599,7 +624,7 @@ class Trainer:
     def save_model(self):
         """Save model weights to disk
         """
-        save_folder = os.path.join(self.log_path, "models", "weights_{}".format(self.epoch))
+        save_folder = os.path.join(self.log_path, "models", "weights_{}".format(self.epoch + 1))
         if not os.path.exists(save_folder):
             os.makedirs(save_folder)
 
