@@ -25,6 +25,9 @@ import datasets
 import networks
 from IPython import embed
 
+torch.backends.cudnn.enabled = False
+torch.cuda.empty_cache()
+
 
 class Trainer:
 
