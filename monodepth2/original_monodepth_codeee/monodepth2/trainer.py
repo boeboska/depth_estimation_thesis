@@ -365,7 +365,7 @@ class Trainer:
 
             outputs[("depth", 0, scale)] = depth
 
-            breakpoint()
+            # breakpoint()
 
             for i, frame_id in enumerate(self.opt.frame_ids[1:]):
 
@@ -443,7 +443,7 @@ class Trainer:
                 reprojection_losses.append(self.compute_reprojection_loss(pred, target))
 
             reprojection_losses = torch.cat(reprojection_losses, 1)
-            print("reprojection", reprojection_losses.mean())
+            # print("reprojection", reprojection_losses.mean())
 
             if not self.opt.disable_automasking:
                 identity_reprojection_losses = []
@@ -453,8 +453,8 @@ class Trainer:
                         self.compute_reprojection_loss(pred, target))
                 identity_reprojection_losses = torch.cat(identity_reprojection_losses, 1)
 
-                print("identity", identity_reprojection_losses.mean())
-                print("-----------")
+                # print("identity", identity_reprojection_losses.mean())
+                # print("-----------")
 
                 if self.opt.avg_reprojection:
                     identity_reprojection_loss = identity_reprojection_losses.mean(1, keepdim=True)
