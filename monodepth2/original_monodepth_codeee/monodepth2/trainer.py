@@ -27,7 +27,25 @@ from IPython import embed
 
 
 class Trainer:
+
+
+
+
+
+
+
     def __init__(self, options):
+
+        self.seed = 0
+        torch.manual_seed(self.seed)
+        torch.cuda.manual_seed(self.seed)
+        torch.cuda.manual_seed_all(self.seed)
+        np.random.seed(self.seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+
+
         self.opt = options
         self.log_path = os.path.join(self.opt.log_dir, self.opt.model_name)
 
