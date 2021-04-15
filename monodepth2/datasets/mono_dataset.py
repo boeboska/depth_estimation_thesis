@@ -18,6 +18,8 @@ import torch
 import torch.utils.data as data
 from torchvision import transforms
 
+random.seed(0)
+
 
 def pil_loader(path):
     # open path as file to avoid ResourceWarning
