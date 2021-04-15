@@ -62,7 +62,7 @@ class MonodepthOptions:
         self.parser.add_argument("--attention_weight",
                                  type=float,
                                  help="attention depth weight",
-                                 default=1.03)
+                                 default=1.05)
         self.parser.add_argument("--edge_weight",
                                  type=float,
                                  help="attention depth weight",

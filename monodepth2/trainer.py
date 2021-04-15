@@ -50,6 +50,9 @@ torch.backends.cudnn.enabled = False
 torch.cuda.empty_cache()
 
 
+torch.autograd.set_detect_anomaly(True)
+
+
 import os
 
 # os.environ["KMP_DUPLICATE_LIB_OK"]= True
@@ -158,6 +161,7 @@ class Trainer:
         # data
         datasets_dict = {"kitti": datasets.KITTIRAWDataset,
                          "kitti_odom": datasets.KITTIOdomDataset}
+
         self.dataset = datasets_dict[self.opt.dataset]
 
         fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files.txt")
@@ -279,9 +283,11 @@ class Trainer:
 
             self.model_optimizer.zero_grad()
 
-            # breakpoint()
 
-            losses["loss"].backward()
+
+            losses["loss_with_attention_weight"].backward()
+
+
             self.model_optimizer.step()
 
             duration = time.time() - before_op_time
@@ -291,7 +297,7 @@ class Trainer:
             late_phase = self.step % 2000 == 0
 
             if early_phase or late_phase:
-                self.log_time(batch_idx, duration, losses["loss"].cpu().data)
+                self.log_time(batch_idx, duration, losses["loss_with_attention_weight"].cpu().data)
 
                 if "depth_gt" in inputs:
                     self.compute_depth_losses(inputs, outputs, losses)
@@ -642,11 +648,6 @@ class Trainer:
 
         attention_mask = inputs['attention'].to(self.device)
 
-        breakpoint()
-
-
-
-
         # everywhing which doesn't belong to the mask, set off
         attention_mask[attention_mask < 0.8] = 0
 
@@ -868,7 +869,7 @@ class Trainer:
     def compute_losses(self, inputs, outputs, batch_idx):
         """Compute the reprojection and smoothness losses for a minibatch
         """
-
+        # breakpoint()
         # because once in the 250 steps you want to plot an edge loss
         if batch_idx % self.opt.save_plot_every == 0 and self.opt.edge_loss:
             original_masks = torch.clone(inputs['attention'])
@@ -881,6 +882,7 @@ class Trainer:
 
         losses = {}
         total_loss = 0
+        total_loss_without_mask = 0
 
         # first determine if you need to calculate the attention mask loss. Then you only have to do this once.
         # this is indepenedned of the scale or frame id.
@@ -888,12 +890,12 @@ class Trainer:
         if self.opt.attention_mask_loss == True:
 
             # do unsqueeze for correct multiplication with ssim , l1 loss
-            attention_weight = inputs['weight_matrix'].to(self.device)
+            attention_mask_weight = inputs['weight_matrix'].to(self.device)
             # attention_weight = attention_mask_weight(self, inputs, batch_idx, original_masks, edge=False).to(self.device)
             # attention_weight = calculate_weight_matrix(self, inputs, batch_idx, original_masks).to(self.device)
             # None
         else:
-            attention_weight = torch.ones(size = (self.opt.batch_size, 1, self.opt.height, self.opt.width)).to(self.device)
+            attention_mask_weight = torch.ones(size = (self.opt.batch_size, 1, self.opt.height, self.opt.width)).to(self.device)
             # print("ONES", attention_weight.shape)
 
 
@@ -914,6 +916,7 @@ class Trainer:
             # 1/0
             # print("scale", scale)
             loss = 0
+            loss_without_mask = 0
             reprojection_losses = []
 
             # reprojection_losses_bob = []
@@ -928,42 +931,62 @@ class Trainer:
             target = inputs[("color", 0, source_scale)]
             # disp, color, target: torch.Size([1, 1, 192, 640]), torch.Size([1, 3, 192, 640]), torch.Size([1, 3, 192, 640])
 
+            predictions = []
             for frame_id in self.opt.frame_ids[1:]:
-                # print("FRAME ID", frame_id)
 
                 # this function selects frame ID -1 and +1. 0 is the target image. So it creates two prediction images
 
                 pred = outputs[("color", frame_id, scale)]
+                predictions.append(pred)
 
 
-                # print("LOSS REPRONECTION")
                 start = time.time()
                 reprojection_losses.append(self.compute_reprojection_loss(pred, target))
-                # reprojection_losses_bob.append(self.compute_reprojection_loss_bob(pred, target, inputs, attention_weight))
 
-                duration = time.time() - start
-                # print("DURATION reprojection", duration)
-
-            # reprojection_losses_bob = torch.cat(reprojection_losses_bob, 1)
             reprojection_losses = torch.cat(reprojection_losses, 1)
 
-
-            # print("REPROJECTION LOSS", sum(reprojection_losses).sum())
-            # losses["reprojection_loss/{}".format(scale)] = reprojection_losses
-            # diff = sum(reprojection_losses_bob).sum() - sum(reprojection_losses).sum()
-            # print("diff", diff)
             # breakpoint()
+
+            # breakpoint()
+
+
+            # nhgfbdv
+
+            #     # create the heatmap
+
+            #
+            #     # put the original rgb kitti image in the subplot
+
+
+            #     plt.close(fig)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
             if self.opt.edge_loss:
 
                 # start = time.time()
                 edge_loss = self.edge_detection_loss(scale, outputs, inputs, not_overlapping_attention_masks, batch_idx, index_numbers_not_overlapping, original_masks)
-                # print("edge loss", self.opt.edge_weight * edge_loss / (2 ** scale))
 
-                # print("EDGE LOSS", self.opt.edge_weight * edge_loss / (2 ** scale))
                 loss += self.opt.edge_weight * edge_loss / (2 ** scale)
-
-                # print("edge loss" , self.opt.edge_weight * edge_loss / (2 ** scale))
 
                 total_edge_loss += self.opt.edge_weight * edge_loss / (2 ** scale)
 
@@ -986,14 +1009,111 @@ class Trainer:
 
                 identity_reprojection_losses = torch.cat(identity_reprojection_losses, 1)
 
+                # fig, axis = plt.subplots(6, 2, figsize=(12, 12))
+                # # fig, ax = plt.subplots(6, 1, figsize=(12, 12))
+                #
+                # axis[0, 0].title.set_text('target frame')
+                # axis[0, 0].axis('off')
+                # axis[0, 0].imshow(inputs['color', 0, 0].cpu().squeeze(0).permute(1, 2, 0).numpy())
+                #
+                # # disp = outputs[("disp", scale)].to(self.device)
+                # # breakpoint()
+                # axis[0, 1].title.set_text('target depth image. min {}, max{}, mean{}'.format(  round(outputs[("disp", 0)].min().item(), 2), round(outputs[("disp", 0)].max().item(), 2), round(outputs[("disp", 0)].mean().item() , 2) )   )
+                # axis[0, 1].axis('off')
+                # axis[0, 1].imshow(outputs[("disp", 0)].cpu().squeeze(0).squeeze(0).detach().numpy())
+                #
+                #
+                # axis[1, 0].title.set_text('1st source frame')
+                # axis[1, 0].axis('off')
+                # axis[1, 0].imshow(inputs['color', -1, 0].cpu().squeeze(0).permute(1, 2, 0).numpy())
+                #
+                # axis[1, 1].title.set_text('2nd source')
+                # axis[1, 1].axis('off')
+                # axis[1, 1].imshow(inputs['color', 1, 0].cpu().squeeze(0).permute(1, 2, 0).numpy())
+                #
+                # axis[2, 0].title.set_text('1st reconstruction')
+                # axis[2, 0].axis('off')
+                # axis[2, 0].imshow(outputs['color', -1, 0].cpu().squeeze(0).permute(1, 2, 0).detach().numpy())
+                #
+                # axis[2, 1].title.set_text('2nd reconstruction')
+                # axis[2, 1].axis('off')
+                # axis[2, 1].imshow(outputs['color', 1, 0].cpu().squeeze(0).permute(1, 2, 0).detach().numpy())
+                # # breakpoint()
+                #
+                # axis[3, 0].title.set_text('Loss 1st reconstruction: {}'.format(round(reprojection_losses[0][0].mean().item(), 3)))
+                # axis[3, 0].axis('off')
+                # sns.heatmap(reprojection_losses[0][0].cpu().detach().numpy(), ax=axis[3, 0], vmin=0, vmax=0.5, cmap='Greens', center=1)
+                #
+                # axis[3, 1].title.set_text('Loss 2nd reconstruction: {}'.format(round(reprojection_losses[0][1].mean().item(), 3)))
+                # axis[3, 1].axis('off')
+                # sns.heatmap(reprojection_losses[0][1].cpu().detach().numpy(), ax=axis[3, 1], vmin=0, vmax=0.5, cmap='Greens', center=1)
+                #
+                #
+                # axis[4, 0].title.set_text('Loss 1st source: {}'.format(round(identity_reprojection_losses[0][0].mean().item(), 3)))
+                # axis[4, 0].axis('off')
+                # sns.heatmap(identity_reprojection_losses[0][0].cpu().detach().numpy(), ax=axis[4, 0], vmin=0, vmax=0.5,cmap='Greens', center=1)
+                #
+                # axis[4, 1].title.set_text('Loss 2nd source: {}'.format(round(identity_reprojection_losses[0][1].mean().item(), 3)))
+                # axis[4, 1].axis('off')
+                # sns.heatmap(identity_reprojection_losses[0][1].cpu().detach().numpy(), ax=axis[4, 1], vmin=0, vmax=0.5,cmap='Greens', center=1)
+                #
+                # abs_diff = torch.abs(inputs['color', -1, 0] - outputs['color', -1, 0])
+                # l1_loss = abs_diff.mean(1, True)
+                #
+                # axis[5, 0].title.set_text('L1 loss between 1st source and 1st reconstructed: {}'.format(round(l1_loss[0][0].mean().item(), 3)))
+                # axis[5, 0].axis('off')
+                # sns.heatmap(l1_loss[0][0].cpu().detach().numpy(), ax=axis[5, 0], vmin=0, vmax=0.5,cmap='Greens', center=1)
+                #
+                #
+                #
+                # ssim_loss = self.ssim(outputs['color', -1, 0], inputs['color', -1, 0]).mean(1, True)
+                # axis[5, 1].title.set_text('SSIM loss between 1st source and 1st reconstructed: {}'.format(round(ssim_loss[0][0].mean().item(), 3)))
+                # axis[5, 1].axis('off')
+                # sns.heatmap(ssim_loss[0][0].cpu().detach().numpy(), ax=axis[5, 1], vmin=0, vmax=0.5, cmap='Greens',center=1)
+                #
+                # fig.savefig('1st_prediction/scale_{}_batch_idx{}'.format(scale, batch_idx))
+
+
+
+                # upsample to kitti size for correct multiplication with attention_mask
+                # disp = F.interpolate(
+                #     disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False).to(self.device)
+
+                # 1st source frame - 1st reconstructed frame
+
+                # 1ST SOURCE FRAME# inputs['color', -1, 0].cpu().squeeze(0).permute(1, 2, 0).numpy()
+                # 1ST RECONSTRUCTED FRAME outputs['color', -1, 0].cpu().squeeze(0).permute(1, 2, 0).detach().numpy())
+
+
+                # breakpoint()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
                 if self.opt.avg_reprojection:
                     identity_reprojection_loss = identity_reprojection_losses.mean(1, keepdim=True)
                 else:
                     # save both images, and do min all at once below
                     identity_reprojection_loss = identity_reprojection_losses
-
-                # print("identity_reprojection_loss", sum(identity_reprojection_loss).sum())
 
 
             # FALSE
@@ -1030,7 +1150,6 @@ class Trainer:
             else:
                 combined = reprojection_loss
 
-            # breakpoint()
             # FALSE
             if combined.shape[1] == 1:
                 to_optimise = combined
@@ -1039,18 +1158,29 @@ class Trainer:
             # je neemt hier per pixel de min tussen de 2 reprojection lossses en identity losses
             # het idee is dat de reprojection losses beter worden dan de identity losses
             else:
-                to_optimise, idxs = torch.min(combined, dim=1)
+                    to_optimise, idxs = torch.min(combined, dim=1)
+
+
+            loss_without_mask += to_optimise.mean()
+            # print("without", loss_without_mask)
 
 
             # multiply the attention mask times the calculated per pixel loss
             if self.opt.attention_mask_loss:
-                total_attention_weight_loss += (to_optimise * attention_weight).mean() - to_optimise.mean()
-                attention_weight_loss_scale = (to_optimise * attention_weight).mean() - to_optimise.mean()
+                """ if reprojection loss is heigher then the identity loss then this is due to no camera motion or moving objects at same speed.
+                for these pixels we use the identity loss such that the loss is lower and no noise to the model
+                so you don't want to mutliply the pixels which use the identity loss because then you upsize the identity loss for these pixels
+                IDX 2,3 = loss reprojection < loss identity. This is fine it means that the estimation via de models is better then without the models
+                IDX 0,1 = loss identity < loss reprojection which means that the estimation without models is better then with the models. 
+                for these pixels skip the weight mask, so set to 1 such that loss after multiplication doens't change
+                """
 
-                to_optimise = to_optimise * attention_weight
+                attention_mask_weight[ idxs < identity_reprojection_loss.shape[1] ] = 1
 
 
+                total_attention_weight_loss += (to_optimise * attention_mask_weight * self.opt.attention_weight).mean() - to_optimise.mean()
 
+                to_optimise = to_optimise * (attention_mask_weight * self.opt.attention_weight)
 
 
             # check which pixel is the minimum and check if this is greater then the identity reprojection for u mask
@@ -1058,13 +1188,11 @@ class Trainer:
             if not self.opt.disable_automasking:
                 outputs["identity_selection/{}".format(scale)] = (
                     idxs > identity_reprojection_loss.shape[1] - 1).float()
-            #
-            # print("loss", loss)
-            # this is still the reprojection loss
-            # print("reporjection loss", to_optimise.mean())
-            loss += to_optimise.mean()
 
-            # print("loss na reprojection", loss)
+
+            loss += to_optimise.mean()
+            # print("with", loss)
+
 
             # calculate smooth loss
             mean_disp = disp.mean(2, True).mean(3, True)
@@ -1088,24 +1216,25 @@ class Trainer:
             # add smooth loss to reprojection loss
             # print("smooth loss", self.opt.disparity_smoothness * smooth_loss / (2 ** scale))
             loss += self.opt.disparity_smoothness * smooth_loss / (2 ** scale)
+            loss_without_mask += self.opt.disparity_smoothness * smooth_loss / (2 ** scale)
             # print("loss na smooth", loss)
 
             total_loss += loss
+            total_loss_without_mask += loss_without_mask
 
             # for tensorboard writing
             losses["loss/{}".format(scale)] = loss
 
-
-
-            losses["additional_weight_loss/{}".format(scale)] = attention_weight_loss_scale
             losses["reprojection_loss/{}".format(scale)] = to_optimise.mean()
 
 
-
-        losses["total_additional_weight_loss"] = total_attention_weight_loss
+        losses["total_additional_weight_loss"] = total_attention_weight_loss / self.num_scales
         losses["edge_loss_total/{}"] = total_edge_loss
+        total_loss_without_mask /= self.num_scales
         total_loss /= self.num_scales
-        losses["loss"] = total_loss
+        losses["loss_with_attention_weight"] = total_loss
+        losses["loss without_attention_weight"] = total_loss_without_mask
+
         return losses
 
     def compute_depth_losses(self, inputs, outputs, losses):
@@ -1176,7 +1305,11 @@ class Trainer:
         # print("log writer")
         # breakpoint()
         writer = self.writers[mode]
-
+        # breakpoint()
+        # writer.add_scalars(f'with and without weight loss', {
+        #     'loss_with': losses[iteration],
+        #     'loss_without': score_nf[iteration],
+        # }, iteration)
 
         # breakpoint()
         for l, v in losses.items():
@@ -1223,7 +1356,7 @@ class Trainer:
     def save_model(self, batch_idx):
         """Save model weights to disk
         """
-        save_folder = os.path.join(self.log_path, "models", "weights_epoch{}_batch_idx{}".format(self.epoch, batch_idx))
+        save_folder = os.path.join(self.log_path, "models", "weights_epoch{}_batch_idx{}".format(self.epoch + 1, batch_idx))
         if not os.path.exists(save_folder):
             os.makedirs(save_folder)
 
