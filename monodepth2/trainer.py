@@ -69,20 +69,22 @@ from attention_weight_mask import *
 
 
 class Trainer:
-    self.seed = 0
-    torch.manual_seed(self.seed)
-    torch.cuda.manual_seed(self.seed)
-    torch.cuda.manual_seed_all(self.seed)
-    np.random.seed(self.seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
 
     torch.cuda.empty_cache()
     print("@@@@@", torch.cuda.is_available())
 
 
     def __init__(self, options):
+
+        self.seed = 0
+        torch.manual_seed(self.seed)
+        torch.cuda.manual_seed(self.seed)
+        torch.cuda.manual_seed_all(self.seed)
+        np.random.seed(self.seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+
         self.opt = options
         self.log_path = os.path.join(self.opt.log_dir, self.opt.model_name)
 
@@ -390,7 +392,7 @@ class Trainer:
 
                     axisangle, translation = self.models["pose"](pose_inputs)
 
-                    # breakpoint()
+
                     outputs[("axisangle", 0, f_i)] = axisangle
                     outputs[("translation", 0, f_i)] = translation
 
@@ -954,42 +956,6 @@ class Trainer:
 
             reprojection_losses = torch.cat(reprojection_losses, 1)
 
-            # breakpoint()
-
-            # breakpoint()
-
-
-            # nhgfbdv
-
-            #     # create the heatmap
-
-            #
-            #     # put the original rgb kitti image in the subplot
-
-
-            #     plt.close(fig)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
             if self.opt.edge_loss:
 
                 # start = time.time()
@@ -1017,105 +983,6 @@ class Trainer:
                         self.compute_reprojection_loss(pred, target))
 
                 identity_reprojection_losses = torch.cat(identity_reprojection_losses, 1)
-
-                # fig, axis = plt.subplots(6, 2, figsize=(12, 12))
-                # # fig, ax = plt.subplots(6, 1, figsize=(12, 12))
-                #
-                # axis[0, 0].title.set_text('target frame')
-                # axis[0, 0].axis('off')
-                # axis[0, 0].imshow(inputs['color', 0, 0].cpu().squeeze(0).permute(1, 2, 0).numpy())
-                #
-                # # disp = outputs[("disp", scale)].to(self.device)
-                # # breakpoint()
-                # axis[0, 1].title.set_text('target depth image. min {}, max{}, mean{}'.format(  round(outputs[("disp", 0)].min().item(), 2), round(outputs[("disp", 0)].max().item(), 2), round(outputs[("disp", 0)].mean().item() , 2) )   )
-                # axis[0, 1].axis('off')
-                # axis[0, 1].imshow(outputs[("disp", 0)].cpu().squeeze(0).squeeze(0).detach().numpy())
-                #
-                #
-                # axis[1, 0].title.set_text('1st source frame')
-                # axis[1, 0].axis('off')
-                # axis[1, 0].imshow(inputs['color', -1, 0].cpu().squeeze(0).permute(1, 2, 0).numpy())
-                #
-                # axis[1, 1].title.set_text('2nd source')
-                # axis[1, 1].axis('off')
-                # axis[1, 1].imshow(inputs['color', 1, 0].cpu().squeeze(0).permute(1, 2, 0).numpy())
-                #
-                # axis[2, 0].title.set_text('1st reconstruction')
-                # axis[2, 0].axis('off')
-                # axis[2, 0].imshow(outputs['color', -1, 0].cpu().squeeze(0).permute(1, 2, 0).detach().numpy())
-                #
-                # axis[2, 1].title.set_text('2nd reconstruction')
-                # axis[2, 1].axis('off')
-                # axis[2, 1].imshow(outputs['color', 1, 0].cpu().squeeze(0).permute(1, 2, 0).detach().numpy())
-                # # breakpoint()
-                #
-                # axis[3, 0].title.set_text('Loss 1st reconstruction: {}'.format(round(reprojection_losses[0][0].mean().item(), 3)))
-                # axis[3, 0].axis('off')
-                # sns.heatmap(reprojection_losses[0][0].cpu().detach().numpy(), ax=axis[3, 0], vmin=0, vmax=0.5, cmap='Greens', center=1)
-                #
-                # axis[3, 1].title.set_text('Loss 2nd reconstruction: {}'.format(round(reprojection_losses[0][1].mean().item(), 3)))
-                # axis[3, 1].axis('off')
-                # sns.heatmap(reprojection_losses[0][1].cpu().detach().numpy(), ax=axis[3, 1], vmin=0, vmax=0.5, cmap='Greens', center=1)
-                #
-                #
-                # axis[4, 0].title.set_text('Loss 1st source: {}'.format(round(identity_reprojection_losses[0][0].mean().item(), 3)))
-                # axis[4, 0].axis('off')
-                # sns.heatmap(identity_reprojection_losses[0][0].cpu().detach().numpy(), ax=axis[4, 0], vmin=0, vmax=0.5,cmap='Greens', center=1)
-                #
-                # axis[4, 1].title.set_text('Loss 2nd source: {}'.format(round(identity_reprojection_losses[0][1].mean().item(), 3)))
-                # axis[4, 1].axis('off')
-                # sns.heatmap(identity_reprojection_losses[0][1].cpu().detach().numpy(), ax=axis[4, 1], vmin=0, vmax=0.5,cmap='Greens', center=1)
-                #
-                # abs_diff = torch.abs(inputs['color', -1, 0] - outputs['color', -1, 0])
-                # l1_loss = abs_diff.mean(1, True)
-                #
-                # axis[5, 0].title.set_text('L1 loss between 1st source and 1st reconstructed: {}'.format(round(l1_loss[0][0].mean().item(), 3)))
-                # axis[5, 0].axis('off')
-                # sns.heatmap(l1_loss[0][0].cpu().detach().numpy(), ax=axis[5, 0], vmin=0, vmax=0.5,cmap='Greens', center=1)
-                #
-                #
-                #
-                # ssim_loss = self.ssim(outputs['color', -1, 0], inputs['color', -1, 0]).mean(1, True)
-                # axis[5, 1].title.set_text('SSIM loss between 1st source and 1st reconstructed: {}'.format(round(ssim_loss[0][0].mean().item(), 3)))
-                # axis[5, 1].axis('off')
-                # sns.heatmap(ssim_loss[0][0].cpu().detach().numpy(), ax=axis[5, 1], vmin=0, vmax=0.5, cmap='Greens',center=1)
-                #
-                # fig.savefig('1st_prediction/scale_{}_batch_idx{}'.format(scale, batch_idx))
-
-
-
-                # upsample to kitti size for correct multiplication with attention_mask
-                # disp = F.interpolate(
-                #     disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False).to(self.device)
-
-                # 1st source frame - 1st reconstructed frame
-
-                # 1ST SOURCE FRAME# inputs['color', -1, 0].cpu().squeeze(0).permute(1, 2, 0).numpy()
-                # 1ST RECONSTRUCTED FRAME outputs['color', -1, 0].cpu().squeeze(0).permute(1, 2, 0).detach().numpy())
-
-
-                # breakpoint()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
                 if self.opt.avg_reprojection:
@@ -1235,7 +1102,6 @@ class Trainer:
             losses["loss/{}".format(scale)] = loss
 
             losses["reprojection_loss/{}".format(scale)] = to_optimise.mean()
-
 
         losses["total_additional_weight_loss"] = total_attention_weight_loss / self.num_scales
         losses["edge_loss_total/{}"] = total_edge_loss
