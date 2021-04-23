@@ -19,8 +19,9 @@ from options import MonodepthOptions
 
 def experiment_training():
 
-    experiment_names = ["experiment#1", "experiment#2", "experiment#3", "experiment#4", "experiment#5", "experiment#6", "experiment#7"]
-    attention_losses = [1.0, 1.03, 1.10, 1.15, 1.20, 1.30, 1.45]
+    seeds = [1, 2]
+    experiment_names = ["experiment#10", "experiment#11", "experiment#12"]
+    attention_losses = [1.3, 1.3, 50]
 
     for attention_number, current_model_name in zip(attention_losses, experiment_names):
 
@@ -30,8 +31,15 @@ def experiment_training():
         file = open('log.txt', 'w')
 
 
+
+
         options = MonodepthOptions()
         opts = options.parse()
+
+        if current_model_name == "experiment#10":
+            opts.seed = seeds[0]
+        if current_model_name == "experiment#11":
+            opts.seed = seeds[1]
 
         opts.attention_weight = attention_number
         opts.model_name = current_model_name
@@ -39,8 +47,6 @@ def experiment_training():
         opts.num_workers = 8
         opts.num_epochs = 6
         opts.attention_mask_loss = True
-
-
 
         trainer = Trainer(opts)
         try:

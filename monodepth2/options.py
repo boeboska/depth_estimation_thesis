@@ -50,14 +50,16 @@ class MonodepthOptions:
                                  type=float,
                                  help="The threshold used for canny edge detection. The lower the number the easier it will find edges",
                                  default=0.2)
+        self.parser.add_argument("--seed",
+                                 type=float,
+                                 help="The random seed used for experiments",
+                                 default=0)
 
         self.parser.add_argument("--weight_mask_method",
                                  type=str,
                                  help="The type of weight mask it will load in",
                                  choices=["avg", "min", "max"],
                                  default='avg')
-
-
 
         self.parser.add_argument("--attention_weight",
                                  type=float,
