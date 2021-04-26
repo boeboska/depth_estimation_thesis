@@ -17,6 +17,8 @@ import torch.utils.data as data
 from torchvision import transforms
 
 
+
+
 def pil_loader(path):
     # open path as file to avoid ResourceWarning
     # (https://github.com/python-pillow/Pillow/issues/835)
@@ -39,6 +41,7 @@ class MonoDataset(data.Dataset):
         img_ext
     """
     def __init__(self,
+                 seed,
                  data_path,
                  filenames,
                  height,
@@ -49,6 +52,7 @@ class MonoDataset(data.Dataset):
                  img_ext='.jpg'):
         super(MonoDataset, self).__init__()
 
+        self.seed = seed
         self.data_path = data_path
         self.filenames = filenames
         self.height = height
@@ -63,6 +67,8 @@ class MonoDataset(data.Dataset):
 
         self.loader = pil_loader
         self.to_tensor = transforms.ToTensor()
+
+        random.seed(self.seed)
 
         # We need to specify augmentations differently in newer versions of torchvision.
         # We first try the newer tuple version; if this fails we fall back to scalars
