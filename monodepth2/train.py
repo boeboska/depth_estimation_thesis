@@ -10,20 +10,19 @@ import sys
 # sys.stdout = file
 import os
 
-
-
-
 import traceback
-from trainer import Trainer
+from trainer_experiment import Trainer
 from options import MonodepthOptions
 
 def experiment_training():
 
-    seeds = [1, 2]
-    experiment_names = ["experiment#10", "experiment#11", "experiment#12"]
-    attention_losses = [1.3, 1.3, 50]
+    # seeds = [0]
+    experiment_names = ["experiment#17", "experiment#18", "experiment#19"]
+    attention_mask_thresholds = [1.05]
+    reduce_attention_weights = [1, 0.9, 0]
 
-    for attention_number, current_model_name in zip(attention_losses, experiment_names):
+
+    for reduce_attention_weight, current_model_name in zip(reduce_attention_weights, experiment_names):
 
         if os.path.exists('output_during_training.txt'):
             os.remove('output_during_training.txt')
@@ -31,32 +30,23 @@ def experiment_training():
         file = open('log.txt', 'w')
 
 
-
-
         options = MonodepthOptions()
         opts = options.parse()
 
-        if current_model_name == "experiment#10":
-            opts.seed = seeds[0]
-        if current_model_name == "experiment#11":
-            opts.seed = seeds[1]
 
-        opts.attention_weight = attention_number
+        opts.attention_mask_threshold = attention_mask_thresholds[0]
         opts.model_name = current_model_name
+        opts.reduce_attention_weight = reduce_attention_weight
         opts.batch_size = 8
         opts.num_workers = 8
         opts.num_epochs = 6
         opts.attention_mask_loss = True
 
         trainer = Trainer(opts)
-        try:
-            trainer.train()
-        except:
-            traceback.print_exc(file=file)
-
-
-
-
+        # try:
+        trainer.train()
+        # except:
+        #     traceback.print_exc(file=file)
 
 if __name__ == "__main__":
     experiment_training()

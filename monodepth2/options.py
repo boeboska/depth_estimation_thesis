@@ -45,7 +45,7 @@ class MonodepthOptions:
         self.parser.add_argument("--save_plot_every",
                                  type=int,
                                  help="how often to save edge loss or additional weight loss images during training",
-                                 default=2500)
+                                 default=1)
         self.parser.add_argument("--edge_detection_threshold",
                                  type=float,
                                  help="The threshold used for canny edge detection. The lower the number the easier it will find edges",
@@ -54,6 +54,21 @@ class MonodepthOptions:
                                  type=float,
                                  help="The random seed used for experiments",
                                  default=0)
+        self.parser.add_argument("--attention_mask_threshold",
+                                 type=float,
+                                 help="All values up to this number are mapped back to 1",
+                                 default=1.05)
+        self.parser.add_argument("--convolution_experiment",
+                                 type=bool,
+                                 help="Perform convolutions over the attention masks",
+                                 default=False)
+        self.parser.add_argument("--top_k",
+                                 type=int,
+                                 help="Load in the best k amount of attention masks when convolution experiment is true. number between 0 - 100",
+                                 default=0)
+
+
+
 
         self.parser.add_argument("--weight_mask_method",
                                  type=str,
@@ -64,7 +79,13 @@ class MonodepthOptions:
         self.parser.add_argument("--attention_weight",
                                  type=float,
                                  help="attention depth weight",
-                                 default=1.05)
+                                 default=5)
+        self.parser.add_argument("--reduce_attention_weight",
+                                 type=float,
+                                 help="map attention weight numbers to this number based on filter rule",
+                                 default=1)
+
+
         self.parser.add_argument("--edge_weight",
                                  type=float,
                                  help="attention depth weight",
@@ -147,7 +168,7 @@ class MonodepthOptions:
         self.parser.add_argument("--batch_size",
                                  type=int,
                                  help="batch size",
-                                 default=2)
+                                 default=1)
         self.parser.add_argument("--learning_rate",
                                  type=float,
                                  help="learning rate",

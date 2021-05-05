@@ -7,6 +7,60 @@ import seaborn as sns
 import copy
 import itertools
 
+
+def plot_loss_tensor(self, inputs, to_optimise, attention_mask_weight, batch_idx, scale, idxs, identity_reprojection_loss):
+
+    fig, axis = plt.subplots(5, 1, figsize=(20, 20))
+
+    original_img = inputs["color_aug", 0, 0]
+
+    original_img = np.array(original_img.squeeze().cpu().detach().permute(1, 2, 0).numpy())
+
+    axis[0].title.set_text('original kitti image')
+    axis[0].axis('off')
+    axis[0].imshow(original_img)
+
+    # create the heatmap
+    axis[1].title.set_text(f'mean original loss{round(to_optimise.mean().item(),2)}')
+    axis[1].axis('off')
+    sns.heatmap(to_optimise.cpu().squeeze(0).detach(), ax=axis[1], vmin=0, vmax=0.6, cmap='Greens', center=1)
+
+    axis[2].title.set_text(f'Our weight matrix first{round(attention_mask_weight.mean().item(), 2)}')
+    axis[2].axis('off')
+    sns.heatmap(attention_mask_weight.cpu().squeeze(0).detach(), ax=axis[2], vmin=0, vmax=1.2, cmap='Greens', center=1)
+
+    # put the original rgb kitti image in the subplot
+
+    # attention_mask_weight[idxs < identity_reprojection_loss.shape[1]] = 1
+    #
+    # axis[3].title.set_text('Our weight matrix adjusted black holes')
+    # axis[3].axis('off')
+    # sns.heatmap(attention_mask_weight.cpu().squeeze(0).detach(), ax=axis[3], vmin=1, vmax=1.2, cmap='Greens', center=1)
+    # breakpoint()
+
+    # alle pixel waarden tot aan 1.05 map maar 1
+    attention_mask_weight[attention_mask_weight <= self.opt.attention_mask_threshold] = self.opt.reduce_attention_weight
+
+    # geef extra weight mee aan pixels die nog over zijn geblevenaa
+    attention_mask_weight[attention_mask_weight > 1] = attention_mask_weight[attention_mask_weight > 1] * self.opt.attention_weight
+
+
+    axis[3].title.set_text(f'Our weight matrix daarna { round(attention_mask_weight.mean().item(), 2)}')
+    axis[3].axis('off')
+    sns.heatmap(attention_mask_weight.cpu().squeeze(0).detach(), ax=axis[3], vmin=0, vmax=1.2,
+                cmap='Greens', center=1)
+
+    to_optimise = to_optimise * attention_mask_weight
+
+    axis[4].title.set_text(f'mean loss after multiplication{round(to_optimise.mean().item(),2)}')
+    sns.heatmap(to_optimise.cpu().squeeze(0).detach(), ax=axis[4], vmin=0, vmax=0.6, cmap='Greens', center=1)
+
+    axis[4].axis('off')
+    plt.tight_layout()
+    fig.savefig(f'loss_tensor_visualization/batch_idx_{batch_idx, scale}.png')
+    plt.close(fig)
+
+
 def determine_weight_matrix(self, overlap_per_pixel, weight_per_mask, attention_masks, method):
     """
     function that receives the an dict which tells which pixels have overlap with which masks
