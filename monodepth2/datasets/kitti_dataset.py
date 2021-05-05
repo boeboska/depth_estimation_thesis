@@ -73,7 +73,6 @@ class KITTIDataset(MonoDataset):
             # print("FLIP")
             weight_matrix = np.fliplr(weight_matrix.numpy())
             weight_matrix = torch.from_numpy(weight_matrix.copy())
-            # print(weight_matrix.shape)
 
         return weight_matrix
 
@@ -82,14 +81,6 @@ class KITTIDataset(MonoDataset):
     def get_attention(self, folder, frame_index, side, do_flip):
 
         attention_masks = {}
-
-        # print("folder", folder)
-        # print("frame index", frame_index)
-
-        # folder = '2011_09_26/2011_09_26_drive_0001_sync/'
-        # frame_index = '0002/'
-        # side = 'r'
-        # print("folder", folder)
         frame_index_start = ""
         frame_index_start = f"{0:010}"
         length = len(str(frame_index))
@@ -115,6 +106,52 @@ class KITTIDataset(MonoDataset):
         return attention_masks
 
 
+    def get_attention_top_k(self, folder, frame_index, side, do_flip):
+        "sort the dict with attention masks based on the attention mask probability"
+
+        attention_masks = {}
+        mask_amount = 0
+        frame_index_start = ""
+        frame_index_start = f"{0:010}"
+        length = len(str(frame_index))
+        frame_index_start = frame_index_start[:-length]
+        frame_index = frame_index_start + str(frame_index)
+        # print("frame _ index", frame_index)
+
+        path = self.attention_path + "/" + folder + "/" + "image_0{}/data/".format(self.side_map[side])  + str(frame_index)
+
+        for subdir, dirs, files in os.walk(path):
+             for file in files:
+
+                 # print("file", file)
+                 # probability = file.split("_")[1].split("jpg")[0][:-1]
+                 # print("PROB", probability)
+                 new_path = path + "/" + file
+                 current_attention = self.attention_loader(new_path)
+
+                 # only save the attention mask probability
+                 file = file.split("_")[1].split(".jpg")[0]
+
+
+                 if do_flip:
+                     current_attention = current_attention.transpose(pil.FLIP_LEFT_RIGHT)
+
+                 # if there is already a attention mask with the same prob.. make a list with masks wich have the same prob
+                 if file in attention_masks:
+                     current_list = attention_masks[file]
+                     current_list.append(current_attention)
+                     attention_masks[file] = current_list
+                     mask_amount += 1
+
+                 # if there is not a attention mask with the same prob number
+                 else:
+
+                    attention_masks[file] = [current_attention]
+                    mask_amount += 1
+
+        return attention_masks, mask_amount
+
+
 
 class KITTIRAWDataset(KITTIDataset):
     """KITTI dataset which loads the original velodyne depth maps for ground truth
@@ -126,6 +163,8 @@ class KITTIRAWDataset(KITTIDataset):
         f_str = "{:010d}{}".format(frame_index, self.img_ext)
         image_path = os.path.join(
             self.data_path, folder, "image_0{}/data".format(self.side_map[side]), f_str)
+
+        # print("IMG PATH", image_path)
         return image_path
 
     def get_depth(self, folder, frame_index, side, do_flip):
