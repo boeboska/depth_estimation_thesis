@@ -43,10 +43,10 @@ def experiment_training():
         opts.attention_mask_loss = True
 
         trainer = Trainer(opts)
-        # try:
-        trainer.train()
-        # except:
-        #     traceback.print_exc(file=file)
+        try:
+            trainer.train()
+        except:
+            traceback.print_exc(file=file)
 
 if __name__ == "__main__":
     experiment_training()
