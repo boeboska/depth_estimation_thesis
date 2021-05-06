@@ -10,6 +10,11 @@ import itertools
 
 def plot_loss_tensor(self, inputs, to_optimise, attention_mask_weight, batch_idx, scale, idxs, identity_reprojection_loss):
 
+
+    path = self.opt.log_dir + self.opt.model_name + "/" + "loss_tensor_visualization/"
+    if not os.path.exists(path):
+        os.makedirs(path)
+
     fig, axis = plt.subplots(5, 1, figsize=(20, 20))
 
     original_img = inputs["color_aug", 0, 0]
@@ -57,7 +62,9 @@ def plot_loss_tensor(self, inputs, to_optimise, attention_mask_weight, batch_idx
 
     axis[4].axis('off')
     plt.tight_layout()
-    fig.savefig(f'loss_tensor_visualization/batch_idx_{batch_idx, scale}.png')
+    # fig.savefig('{}/epoch_{}_batch_{}_batch_idx_{}_p1.png'.format(path, self.epoch, batch_nr, batch_idx))
+
+    fig.savefig(f'{path}/batch_idx_{batch_idx, scale}.png')
     plt.close(fig)
 
 
