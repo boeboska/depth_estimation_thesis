@@ -27,7 +27,7 @@ def experiment_training():
         if os.path.exists('output_during_training.txt'):
             os.remove('output_during_training.txt')
         open('output_during_training.txt', 'w')
-        file = open('log.txt', 'w')
+        file = open('log{}.txt', 'w'.format(experiment_names))
 
 
         options = MonodepthOptions()
@@ -49,12 +49,12 @@ def experiment_training():
         #     traceback.print_exc(file=file)
 
 if __name__ == "__main__":
-    # experiment_training()
-    options = MonodepthOptions()
-    opts = options.parse()
-    trainer = Trainer(opts)
-    # # try:
-    trainer.train()
-    # except:
+    experiment_training()
+    # options = MonodepthOptions()
+    # opts = options.parse()
+    # trainer = Trainer(opts)
+    # # # try:
+    # trainer.train()
+    # # except:
 
 
