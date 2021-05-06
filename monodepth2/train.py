@@ -49,10 +49,12 @@ def experiment_training():
         #     traceback.print_exc(file=file)
 
 if __name__ == "__main__":
-    experiment_training()
-    # trainer = Trainer(opts)
+    # experiment_training()
+    options = MonodepthOptions()
+    opts = options.parse()
+    trainer = Trainer(opts)
     # # try:
-    # trainer.train()
+    trainer.train()
     # except:
 
 
