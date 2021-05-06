@@ -241,7 +241,7 @@ class MonodepthOptions:
         self.parser.add_argument("--save_frequency",
                                  type=int,
                                  help="number of epochs between each save",
-                                 default=250)
+                                 default=1)
 
         # EVALUATION options
         self.parser.add_argument("--eval_stereo",
