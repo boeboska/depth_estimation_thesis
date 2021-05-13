@@ -8,31 +8,33 @@ import copy
 import itertools
 
 
-def plot_loss_tensor(self, inputs, to_optimise, attention_mask_weight, batch_idx, scale, idxs, identity_reprojection_loss):
+
+def plot_loss_tensor(self, inputs, to_optimise, attention_mask_weight, batch_idx, scale, idxs, identity_reprojection_loss,
+                     loss_inside_mask, loss_inside_mask_dialation_1, loss_inside_mask_dialation_3):
 
 
     path = self.opt.log_dir + self.opt.model_name + "/" + "loss_tensor_visualization/"
     if not os.path.exists(path):
         os.makedirs(path)
 
-    fig, axis = plt.subplots(5, 1, figsize=(20, 20))
+    fig, axis = plt.subplots(5, 2, figsize=(45, 20))
 
     original_img = inputs["color_aug", 0, 0]
 
     original_img = np.array(original_img[0].squeeze().cpu().detach().permute(1, 2, 0).numpy())
 
-    axis[0].title.set_text('original kitti image')
-    axis[0].axis('off')
-    axis[0].imshow(original_img)
+    axis[0, 0].title.set_text('original kitti image')
+    axis[0, 0].axis('off')
+    axis[0, 0 ].imshow(original_img)
 
     # create the heatmap
-    axis[1].title.set_text(f'mean original loss{round(to_optimise[0].mean().item(),2)}')
-    axis[1].axis('off')
-    sns.heatmap(to_optimise[0].cpu().squeeze(0).detach(), ax=axis[1], vmin=0, vmax=0.6, cmap='Greens', center=1)
+    axis[0, 1].title.set_text(f'mean original loss{round(to_optimise[0].mean().item(),2)}')
+    axis[0, 1].axis('off')
+    sns.heatmap(to_optimise[0].cpu().squeeze(0).detach(), ax=axis[0, 1], vmin=0, vmax=0.6, cmap='Greens', center=1)
 
-    axis[2].title.set_text(f'Our weight matrix first{round(attention_mask_weight[0].mean().item(), 2)}')
-    axis[2].axis('off')
-    sns.heatmap(attention_mask_weight[0].cpu().squeeze(0).detach(), ax=axis[2], vmin=0, vmax=1.2, cmap='Greens', center=1)
+    axis[1, 0].title.set_text(f'Our weight matrix first mean{round(attention_mask_weight[0].mean().item(), 2)}')
+    axis[1, 0].axis('off')
+    sns.heatmap(attention_mask_weight[0].cpu().squeeze(0).detach(), ax=axis[1, 0], vmin=0, vmax=1.2, cmap='Greens', center=1)
 
     # put the original rgb kitti image in the subplot
 
@@ -50,17 +52,55 @@ def plot_loss_tensor(self, inputs, to_optimise, attention_mask_weight, batch_idx
     attention_mask_weight[attention_mask_weight > 1] = attention_mask_weight[attention_mask_weight > 1] * self.opt.attention_weight
 
 
-    axis[3].title.set_text(f'Our weight matrix daarna { round(attention_mask_weight[0].mean().item(), 2)}')
-    axis[3].axis('off')
-    sns.heatmap(attention_mask_weight[0].cpu().squeeze(0).detach(), ax=axis[3], vmin=0, vmax=1.2,
+    axis[1, 1].title.set_text(f'Our weight matrix daarna mean  { round(attention_mask_weight[0].mean().item(), 2)}')
+    axis[1, 1].axis('off')
+    sns.heatmap(attention_mask_weight[0].cpu().squeeze(0).detach(), ax=axis[1, 1], vmin=0, vmax=1.2,
                 cmap='Greens', center=1)
+
+
+    axis[3, 0].title.set_text(f'Dialation 1 mask sum {round(loss_inside_mask_dialation_1[0].sum().item(), 2)}')
+    sns.heatmap( loss_inside_mask_dialation_1[0].cpu().detach().numpy(), ax=axis[3, 0], vmin=0, vmax=0.6,
+                cmap='Greens', center=1)
+    axis[3, 0].axis('off')
+
+    axis[4, 0].title.set_text(f'Dialation 3 mask sum {round(loss_inside_mask_dialation_3[0].sum().item(), 2)}')
+    sns.heatmap( loss_inside_mask_dialation_3[0].cpu().detach().numpy(), ax=axis[4, 0], vmin=0, vmax=0.6,
+                cmap='Greens', center=1)
+    axis[4, 0].axis('off')
+
+
 
     to_optimise = to_optimise * attention_mask_weight
 
-    axis[4].title.set_text(f'mean loss after multiplication{round(to_optimise[0].mean().item(),2)}')
-    sns.heatmap(to_optimise[0].cpu().squeeze(0).detach(), ax=axis[4], vmin=0, vmax=0.6, cmap='Greens', center=1)
+    axis[2, 0].title.set_text(f'mean loss after multiplication{round(to_optimise[0].mean().item(),2)}')
+    sns.heatmap(to_optimise[0].cpu().squeeze(0).detach(), ax=axis[2, 0], vmin=0, vmax=0.6, cmap='Greens', center=1)
+    axis[2, 0].axis('off')
 
-    axis[4].axis('off')
+    # breakpoint()
+
+    axis[2, 1].title.set_text(f'Sum loss inside mask{round( (loss_inside_mask[0] * to_optimise[0]).sum().item(), 2)}')
+    sns.heatmap((loss_inside_mask[0] * to_optimise[0]).cpu().squeeze(0).detach(), ax=axis[2, 1], vmin=0, vmax=0.6, cmap='Greens', center=1)
+    axis[2, 1].axis('off')
+
+    # breakpoint()
+
+
+    # breakpoint()
+
+
+    axis[3, 1].title.set_text(f'Sum  loss inside mask dialation 1 --- {round((torch.tensor(loss_inside_mask_dialation_1[0]).to(self.device) * to_optimise[0]).sum().item(), 2)}')
+    sns.heatmap((torch.tensor(loss_inside_mask_dialation_1[0]).squeeze(0).to(self.device) * to_optimise[0]).cpu().squeeze(0).detach(), ax=axis[3, 1], vmin=0, vmax=0.6,
+                cmap='Greens', center=1)
+    axis[3, 1].axis('off')
+
+    axis[4, 1].title.set_text(f'Sum  loss inside mask dialation 3 --- {round((torch.tensor(loss_inside_mask_dialation_3[0]).to(self.device) * to_optimise[0]).sum().item(), 2)}')
+    sns.heatmap((torch.tensor(loss_inside_mask_dialation_3[0]).to(self.device) * to_optimise[0]).cpu().squeeze(0).detach(), ax=axis[4, 1], vmin=0, vmax=0.6,
+                cmap='Greens', center=1)
+    axis[4, 1].axis('off')
+
+
+
+
     plt.tight_layout()
     # fig.savefig('{}/epoch_{}_batch_{}_batch_idx_{}_p1.png'.format(path, self.epoch, batch_nr, batch_idx))
 

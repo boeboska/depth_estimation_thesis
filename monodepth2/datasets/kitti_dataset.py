@@ -11,6 +11,7 @@ import os
 import skimage.transform
 import numpy as np
 import PIL.Image as pil
+from torchvision import transforms
 
 from PIL import Image  # using pillow-simd for increased speed
 
@@ -77,7 +78,6 @@ class KITTIDataset(MonoDataset):
         return weight_matrix
 
 
-
     def get_attention(self, folder, frame_index, side, do_flip):
 
         attention_masks = {}
@@ -90,19 +90,44 @@ class KITTIDataset(MonoDataset):
 
         path = self.attention_path + "/" + folder + "/" + "image_0{}/data/".format(self.side_map[side])  + str(frame_index)
 
+        count_mask = 0
         for subdir, dirs, files in os.walk(path):
              for file in files:
+
+                 count_mask +=1
                  # print("file", file)
                  # probability = file.split("_")[1].split("jpg")[0][:-1]
                  # print("PROB", probability)
                  new_path = path + "/" + file
                  current_attention = self.attention_loader(new_path)
 
-                 if do_flip:
-                     current_attention = current_attention.transpose(pil.FLIP_LEFT_RIGHT)
-                 attention_masks[file] = current_attention
-                 # print(self.attention_loader(new_path))
+                 prob = float(file.split("_")[1].split(".jpg")[0])
+                 # print(prob)
+                 # print(type(prob))
 
+                 # only load in the file if its prob is high enough
+                 if prob >= self.attention_threshold:
+
+
+                     if do_flip:
+                         current_attention = current_attention.transpose(pil.FLIP_LEFT_RIGHT)
+
+
+                     attention_map = transforms.ToTensor()(current_attention)
+
+                     size_check = attention_map.clone()
+                     size_check[size_check >= 0.8] = 1
+                     size_check[size_check < 0.8] = 0
+                     size = torch.sum(size_check).item()
+
+
+                     attention_masks[file] = (size, attention_map)
+
+                # if prob of current attention mask is not heigh enough, go to next one
+                 else:
+                     continue
+
+        assert count_mask == 100, "There should be 100 attention masks saved for this kitti image. its now {}".format(count_mask)
         return attention_masks
 
 

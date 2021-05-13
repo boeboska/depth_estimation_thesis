@@ -211,33 +211,37 @@ class MonoDataset(data.Dataset):
             else:
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index + i, side, do_flip)
 
+                if i == 0:
+                    weight_matrix = self.get_weight_matrix(folder, frame_index, side, do_flip)
+                    inputs[("weight_matrix")] = weight_matrix
+
             # only add the attention masks for the target frame (frame 0)
                 if self.edge_loss:
                     if i == 0:
 
                         # look up attention masks for target frame
-                        attention_masks = self.get_attention(folder, frame_index, side, do_flip)
+                        # attention mask is a dict with key = file name value = (size, mask)
+                        attention_masks_dict = self.get_attention(folder, frame_index, side, do_flip)
 
-                        assert len(attention_masks) == 100, "There should be 100 attention masks saved for this kitti image. its now {}".format(len(attention_masks))
 
-                        # decide which attention masks will be used based on attention_threshold probability
-                        attention_list = []
+                        # try:
+                        # breakpoint()
+                        sorted_attention_masks_dict = sorted(attention_masks_dict.values())
+                        # except:
+                        #     breakpoint()
+
+                        a = torch.empty(len(attention_masks_dict), self.height, self.width)
+
                         loop_count = 0
+                        for value in sorted_attention_masks_dict:
+                            # print("value", value)
+                            # value = (size , tensor)
+                            a[loop_count] = value[1]
 
-                        a = torch.empty(self.mask_amount, self.height, self.width)
-                        for key, value in attention_masks.items():
+                            loop_count += 1
 
-                            # if you have loaded in the maximum amount of masks for this threshold
-                            if loop_count > self.mask_amount -1:
-                                break
 
-                            # check if prob from attention masks is high enough for threshold
-                            if float(key.split("_")[1].split("jpg")[0][:-1]) >= self.attention_threshold:
-                                value = transforms.ToTensor()(value)
-                                a[loop_count] = value
-
-                                loop_count += 1
-
+                        assert loop_count == len(attention_masks_dict)
                         inputs[("attention")] = a
 
                 if self.attention_mask_loss:
