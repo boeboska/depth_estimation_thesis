@@ -599,7 +599,7 @@ class Trainer:
         total_loss_within_mask_dialation_1 = 0
         total_loss_within_mask_dialation_3 = 0
 
-        # _, original_attention_masks, loss_inside_mask_tensor, loss_inside_mask_tensor_dialation_1, loss_inside_mask_tensor_dialation_3 = self.prepare_attention_masks(inputs)
+        _, original_attention_masks, loss_inside_mask_tensor, loss_inside_mask_tensor_dialation_1, loss_inside_mask_tensor_dialation_3 = self.prepare_attention_masks(inputs)
 
                # first determine if you need to calculate the attention mask loss. Then you only have to do this once.
         # this is indepenedned of the scale or frame id.
