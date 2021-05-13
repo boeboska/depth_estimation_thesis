@@ -257,7 +257,7 @@ class Trainer:
         diff_1 = (self.val_losses[-1] - self.val_losses[-2]) / self.val_losses[-2]
         diff_2 = (self.val_losses[-2] - self.val_losses[-3]) / self.val_losses[-3]
         diff_3 = (self.val_losses[-3] - self.val_losses[-4]) / self.val_losses[-4]
-        print(diff_1, diff_2, diff_3)
+        # print(diff_1, diff_2, diff_3)
 
         if abs(diff_1) and abs(diff_2) and abs(diff_3) < self.opt.early_stop_percentage:
             self.save_model(batch_idx)
@@ -277,7 +277,7 @@ class Trainer:
 
         for batch_idx, inputs in enumerate(self.train_loader):
 
-            print(batch_idx)
+            # print(batch_idx)
             # print(inputs.shape)
 
             before_op_time = time.time()
