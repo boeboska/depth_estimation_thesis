@@ -36,9 +36,11 @@ def experiment_training():
         opts.attention_mask_loss = attention_mask
         opts.model_name = current_model_name
         opts.reduce_attention_weight = reduce_attention_weight
-        opts.batch_size = 1
-        opts.num_workers = 1
+        opts.batch_size = 8
+        opts.num_workers = 8
         opts.num_epochs = 6
+
+
 
         trainer = Trainer(opts)
         try:
