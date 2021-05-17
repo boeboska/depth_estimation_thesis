@@ -683,14 +683,15 @@ class Trainer:
 
             if self.opt.edge_loss:
 
-                edge_loss = edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, self.device, self.opt.height, self.opt.width, self.opt.log_dir, self.opt.model_name, self.opt.edge_detection_threshold, self.opt.save_plot_every, self.opt.batch_size).to(self.device)
+                if scale == 0:
+                    edge_loss = edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, self.device, self.opt.height, self.opt.width, self.opt.log_dir, self.opt.model_name, self.opt.edge_detection_threshold, self.opt.save_plot_every, self.opt.batch_size).to(self.device)
 
-                loss += self.opt.edge_weight * edge_loss / (2 ** scale)
+                    loss += self.opt.edge_weight * edge_loss
 
-                total_edge_loss += self.opt.edge_weight * edge_loss / (2 ** scale)
+                    total_edge_loss += self.opt.edge_weight * edge_loss
 
-                # add for writing to tensorboard
-                losses["edge_loss/{}".format(scale)] = self.opt.edge_weight * edge_loss / (2 ** scale)
+                    # add for writing to tensorboard
+                    losses["edge_loss/{}".format(scale)] = self.opt.edge_weight * edge_loss
 
             # this statement is performed
             if not self.opt.disable_automasking:
@@ -720,7 +721,7 @@ class Trainer:
 
                 reprojection_losses *= mask
 
-                # add a loss pushing mask to 1 (using nn.BCELoss for stability)
+                # add a loss pushing m ask to 1 (using nn.BCELoss for stability)
                 weighting_loss = 0.2 * nn.BCELoss()(mask, torch.ones(mask.shape).cuda())
                 loss += weighting_loss.mean()
 

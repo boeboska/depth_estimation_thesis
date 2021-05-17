@@ -77,7 +77,7 @@ def edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, device, height, 
                     fig.savefig(
                         '{}/batchIDX_{}_threshold_{}_i_{}_scale{}.png'.format(path, batch_idx,
                                                                           edge_detection_threshold, i, scale))
-
+                    plt.close('all')
         # breakpoint()
     return edges_overall.sum()
 
