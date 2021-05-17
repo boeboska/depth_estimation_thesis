@@ -223,26 +223,25 @@ class MonoDataset(data.Dataset):
                         # attention mask is a dict with key = file name value = (size, mask)
                         attention_masks_dict = self.get_attention(folder, frame_index, side, do_flip)
 
+                        # # attention_masks_dict['68_0_858.jpg']: (235, M)
+                        mask_sizes = np.array([attention_masks_dict[key][0] for key in attention_masks_dict])
+                        masks = torch.from_numpy(np.vstack([attention_masks_dict[key][1] for key in attention_masks_dict]))
 
-                        # try:
-                        # breakpoint()
-                        sorted_attention_masks_dict = sorted(attention_masks_dict.values())
-                        # except:
-                        #     breakpoint()
+                        mask_order = mask_sizes.argsort()
 
-                        a = torch.empty(len(attention_masks_dict), self.height, self.width)
+                        # mask_sizes_sorted = mask_sizes[mask_order]
+                        masks_sorted = masks[mask_order]
 
-                        loop_count = 0
-                        for value in sorted_attention_masks_dict:
-                            # print("value", value)
-                            # value = (size , tensor)
-                            a[loop_count] = value[1]
+                        # 100, 192, 640
+                        zeros = torch.zeros(100, self.height, self.width)
+                        # check how many dimension are missing to create a 100, 192, 640 tensor such then every image got same dimensions
+                        diff = zeros.shape[0] - masks_sorted.shape[0]
 
-                            loop_count += 1
+                        masks_sorted = torch.cat([masks_sorted, torch.zeros(diff, self.height, self.width)])
 
+                        # print(masks_sorted.shape)
 
-                        assert loop_count == len(attention_masks_dict)
-                        inputs[("attention")] = a
+                        inputs[("attention")] = masks_sorted
 
                 if self.attention_mask_loss:
                     if i == 0:

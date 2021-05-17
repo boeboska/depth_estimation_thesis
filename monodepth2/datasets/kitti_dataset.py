@@ -123,6 +123,10 @@ class KITTIDataset(MonoDataset):
 
                      attention_masks[file] = (size, attention_map)
 
+                     # if len(attention_masks) > 30:
+                     #     return attention_masks
+
+
                 # if prob of current attention mask is not heigh enough, go to next one
                  else:
                      continue

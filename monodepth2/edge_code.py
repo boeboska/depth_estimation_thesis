@@ -7,85 +7,79 @@ import seaborn as sns
 import cv2
 import torch.nn.functional as F
 
+def edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, device, height, width, log_dir, model_name, edge_detection_threshold, save_plot_every, batch_size):
 
-def edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, self):
+    edges_overall = torch.zeros(batch_size, height, width).clone()
 
-    path = self.opt.log_dir + self.opt.model_name + "/" + "edge_loss_img/"
+    path = log_dir + model_name + "/" + "edge_loss_img/"
     if not os.path.exists(path):
         os.makedirs(path)
 
-    print(inputs['attention'].shape)
-    # breakpoint()
-    attention_masks = inputs['attention'].to(self.device)
+    attention_masks = inputs['attention'].to(device)
 
     attention_masks[attention_masks >= 0.8] = 1
     attention_masks[attention_masks < 0.8] = 0
-
-    attention_masks_plot = attention_masks
-    # breakpoint()
-
-    attention_masks = torch.sum(attention_masks, dim = 1)
-
-    attention_masks[attention_masks >= 1] = 1
 
     attention_masks_plot = attention_masks
 
     disp = outputs[("disp", scale)]
     # upsample to kitti size for correct multiplication with attention_mask
     disp = F.interpolate(
-        disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
+        disp, [height, width], mode="bilinear", align_corners=False)
 
+    for b in range(batch_size):
 
+        # cast to int for correct canny input
+        depth_mask = np.uint8(disp[b].squeeze().cpu().detach().numpy() * 255)
 
-    depth_mask = attention_masks.squeeze(0) * disp.squeeze(0).squeeze(0)
+        edges_disp = torch.from_numpy(cv2.Canny(depth_mask, edge_detection_threshold * 255, edge_detection_threshold * 255,
+                               apertureSize=3, L2gradient=False))
 
-    depth_mask_plot = depth_mask
+        for i, attention_mask in enumerate(attention_masks[b].squeeze(dim=0)):
 
-    depth_mask = depth_mask * 255
+            # the last x attention masks are zeros so skip them
+            if attention_mask.sum().item() == 0:
+                break
 
-    # cast to int for correct canny input
-    depth_mask = np.uint8(depth_mask.cpu().detach().numpy())
+            edges_per_attention_mask = attention_mask.cpu() * edges_disp.to(torch.float32).cpu()
 
-    edges_disp = cv2.Canny(depth_mask, self.opt.edge_detection_threshold * 255, self.opt.edge_detection_threshold * 255,
-                           apertureSize=3, L2gradient=False)
+            # if sum ==0 then the found edges from attention mask are not yet in the overall edges
+            if (edges_per_attention_mask * edges_overall[b]).sum().item() == 0 and (edges_per_attention_mask > 0).any():
 
-    fig, ax = plt.subplots(5, 1, figsize=(12, 12))
+                edges_overall[b] += (edges_per_attention_mask / 255)
 
-    original_img = inputs["color_aug", 0, 0]
+                if batch_idx % save_plot_every == 0 and b == 0:
 
-    original_img = np.array(original_img.squeeze().cpu().detach().permute(1, 2, 0).numpy())
+                    original_img = inputs["color_aug", 0, 0][b]
 
-    # 2, 192, 640, 3
-    ax[0].imshow(original_img)
-    ax[0].title.set_text('Original image')
-    ax[0].axis('off')
+                    original_img = np.array(original_img.squeeze().cpu().detach().permute(1, 2, 0).numpy())
 
-    ax[1].imshow(disp.squeeze(0).squeeze(0).cpu().detach().numpy())
-    ax[1].title.set_text('depth imagw')
-    ax[1].axis('off')
+                    fig, axis = plt.subplots(6, 1, figsize=(12, 12))
+                    axis[0].imshow(attention_mask.cpu().detach().numpy())
+                    axis[0].title.set_text('attention maske')
+                    axis[1].imshow(edges_per_attention_mask.cpu().detach().numpy() / 255)
+                    axis[1].title.set_text(f'edge per attentio mask SUM {edges_per_attention_mask.sum()}')
+                    axis[2].imshow(edges_overall[b].cpu().detach().numpy())
+                    axis[2].title.set_text(f'ALLES SUM {edges_overall[b].sum()}')
 
-    ax[2].imshow(attention_masks_plot.squeeze(0).cpu().detach().numpy())
-    ax[2].title.set_text('attention masks')
-    ax[2].axis('off')
+                    axis[3].imshow(original_img)
+                    axis[3].title.set_text('Original image')
+                    axis[3].axis('off')
 
-    disp_min = np.uint8(disp.min().cpu().detach().numpy() * 255)
-    disp_max = np.uint8(disp.max().cpu().detach().numpy() * 255)
+                    axis[4].imshow(disp[b].squeeze(0).squeeze(0).cpu().detach().numpy())
+                    axis[4].title.set_text('depth imagw')
+                    axis[4].axis('off')
 
-    ax[3].imshow(depth_mask_plot.cpu().detach().numpy(), vmin=disp_min, vmax=disp_max)
-    ax[3].title.set_text('depth mask masks')
-    ax[3].axis('off')
+                    axis[5].imshow(edges_disp / 255)
+                    axis[5].title.set_text('edges')
+                    axis[5].axis('off')
 
+                    fig.savefig(
+                        '{}/batchIDX_{}_threshold_{}_i_{}_scale{}.png'.format(path, batch_idx,
+                                                                          edge_detection_threshold, i, scale))
 
-    ax[4].imshow(edges_disp / 255)
-    ax[4].title.set_text('edges')
-    ax[4].axis('off')
-    #
-
-    fig.savefig(
-        '{}/epoch_{}_batchIDX_{}_threshold_{}.png'.format(path, self.epoch, batch_idx, self.opt.edge_detection_threshold))
-
-
-    return None
+        # breakpoint()
+    return edges_overall.sum()
 
 def edge_detection_loss(self, scale, outputs, inputs, attention_mask, batch_idx, index_nrs_not_overlapping,
                         original_attention):

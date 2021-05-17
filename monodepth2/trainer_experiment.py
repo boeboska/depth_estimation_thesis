@@ -417,6 +417,40 @@ class Trainer:
 
         return outputs
 
+    def val_all(self):
+        """Validate on the whole validation set"""
+
+        loss_per_mask_size = {}
+
+        self.set_eval()
+
+        # loop over all the validation images
+        for batch_idx, inputs in enumerate(self.val_loader):
+            print(batch_idx)
+            with torch.no_grad():
+                print("IK BEN HIER")
+
+                outputs, losses = self.process_batch(inputs, batch_idx)
+
+                # print(losses)
+
+                # if that pixel amount was not yet in the dict add a new list
+                if losses['amount_pixels_inside_mask'] not in loss_per_mask_size:
+                    loss_per_mask_size[losses['amount_pixels_inside_mask']] = [ losses['amount_pixels_inside_mask'] ]
+                else:
+                    current_list = loss_per_mask_size[losses['amount_pixels_inside_mask']]
+                    current_list = current_list.append(losses['amount_pixels_inside_mask'])
+                    loss_per_mask_size[losses['amount_pixels_inside_mask']] = current_list
+
+                breakpoint()
+
+
+
+
+
+
+
+
     def val(self, inputs, batch_idx):
         """Validate the model on a single minibatch
         """
@@ -428,6 +462,7 @@ class Trainer:
             inputs = self.val_iter.next()
 
         with torch.no_grad():
+            # breakpoint()
             outputs, losses = self.process_batch(inputs, batch_idx)
 
             if "depth_gt" in inputs:
@@ -467,7 +502,6 @@ class Trainer:
             axis[1].imshow(original_img)
             fig.savefig('{}/epoch_{}_batch_idx_{}_batch_{}.png'.format(path, self.epoch, batch_idx, b))
             plt.close(fig)
-
 
     def generate_images_pred(self, inputs, outputs):
         """Generate the warped (reprojected) color images for a minibatch.
@@ -544,19 +578,18 @@ class Trainer:
 
         original_attention_mask = attention_mask_weight.clone()
 
-
         # values <= 1.05 to 0. so only left with the small attention masks
         attention_masks_for_calculating_loss_inside_mask[attention_masks_for_calculating_loss_inside_mask <= self.opt.attention_mask_threshold] = 0
 
         # > 0 = 1
         attention_masks_for_calculating_loss_inside_mask[attention_masks_for_calculating_loss_inside_mask > 0] = 1
 
+        amount_pixels_inside_mask = attention_masks_for_calculating_loss_inside_mask.sum().item()
+
         attention_masks_for_calculating_loss_inside_mask_with_dilation_1 = attention_masks_for_calculating_loss_inside_mask.clone()
         attention_masks_for_calculating_loss_inside_mask_with_dilation_3 = attention_masks_for_calculating_loss_inside_mask.clone()
 
         kernel = np.ones((2, 2), np.uint8)
-
-        # breakpoint()
 
         for b in range(attention_masks_for_calculating_loss_inside_mask_with_dilation_1.shape[0]):
             attention_masks_for_calculating_loss_inside_mask_with_dilation_1[b] = torch.tensor(cv2.dilate(attention_masks_for_calculating_loss_inside_mask_with_dilation_1[b].cpu().detach().numpy(), kernel, iterations=1))
@@ -571,8 +604,7 @@ class Trainer:
                                                                attention_mask_weight > 1] * self.opt.attention_weight
 
 
-
-        return attention_mask_weight, original_attention_mask, attention_masks_for_calculating_loss_inside_mask, attention_masks_for_calculating_loss_inside_mask_with_dilation_1, attention_masks_for_calculating_loss_inside_mask_with_dilation_3
+        return attention_mask_weight, original_attention_mask, attention_masks_for_calculating_loss_inside_mask, attention_masks_for_calculating_loss_inside_mask_with_dilation_1, attention_masks_for_calculating_loss_inside_mask_with_dilation_3, amount_pixels_inside_mask
 
 
 
@@ -594,19 +626,23 @@ class Trainer:
         losses = {}
         total_loss = 0
         total_loss_without_mask = 0
+        total_loss_without_edge = 0
 
         total_loss_within_mask = 0
         total_loss_within_mask_dialation_1 = 0
         total_loss_within_mask_dialation_3 = 0
 
-        _, original_attention_masks, loss_inside_mask_tensor, loss_inside_mask_tensor_dialation_1, loss_inside_mask_tensor_dialation_3 = self.prepare_attention_masks(inputs)
+        total_edge_loss = 0
+        total_attention_weight_loss = 0
+
+        _, original_attention_masks, loss_inside_mask_tensor, loss_inside_mask_tensor_dialation_1, loss_inside_mask_tensor_dialation_3, amount_pixels_inside_mask= self.prepare_attention_masks(inputs)
 
                # first determine if you need to calculate the attention mask loss. Then you only have to do this once.
         # this is indepenedned of the scale or frame id.
         # batch size , 192, 640
         if self.opt.attention_mask_loss == True:
 
-            attention_mask_weight, original_attention_masks, loss_inside_mask_tensor, loss_inside_mask_tensor_dialation_1, loss_inside_mask_tensor_dialation_3 = self.prepare_attention_masks(inputs)
+            attention_mask_weight, original_attention_masks, loss_inside_mask_tensor, loss_inside_mask_tensor_dialation_1, loss_inside_mask_tensor_dialation_3, amount_pixels_inside_mask = self.prepare_attention_masks(inputs)
 
         else:
             attention_mask_weight = torch.ones(size=(self.opt.batch_size, 1, self.opt.height, self.opt.width)).to(
@@ -620,11 +656,9 @@ class Trainer:
             # because you don't want overlapping masks for edge detection because you might find the same edge multiple times
             # not_overlapping_attention_masks, index_numbers_not_overlapping = overlapping_masks_edge_detection(self, inputs, batch_idx, original_masks)
 
-        total_edge_loss = 0
-        total_attention_weight_loss = 0
-
         for scale in self.opt.scales:
             loss = 0
+            loss_without_edge = 0
             loss_without_mask = 0
             loss_within_mask = 0
             loss_within_mask_dialation_1 = 0
@@ -649,17 +683,14 @@ class Trainer:
 
             if self.opt.edge_loss:
 
-                edge_detection_bob_hidde(scale, outputs, inputs, batch_idx,self)
+                edge_loss = edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, self.device, self.opt.height, self.opt.width, self.opt.log_dir, self.opt.model_name, self.opt.edge_detection_threshold, self.opt.save_plot_every, self.opt.batch_size).to(self.device)
 
-                # start = time.time()
-                # edge_loss = self.edge_detection_loss(scale, outputs, inputs, not_overlapping_attention_masks, batch_idx, index_numbers_not_overlapping, original_masks)
+                loss += self.opt.edge_weight * edge_loss / (2 ** scale)
 
-                # loss += self.opt.edge_weight * edge_loss / (2 ** scale)
-
-                # total_edge_loss += self.opt.edge_weight * edge_loss / (2 ** scale)
+                total_edge_loss += self.opt.edge_weight * edge_loss / (2 ** scale)
 
                 # add for writing to tensorboard
-                # losses["edge_loss/{}".format(scale)] = self.opt.edge_weight * edge_loss / (2 ** scale)
+                losses["edge_loss/{}".format(scale)] = self.opt.edge_weight * edge_loss / (2 ** scale)
 
             # this statement is performed
             if not self.opt.disable_automasking:
@@ -718,6 +749,7 @@ class Trainer:
 
 
             loss_without_mask += to_optimise.mean()
+            loss_without_edge += to_optimise.mean()
 
             # breakpoint()
             loss_within_mask += torch.mean(to_optimise * loss_inside_mask_tensor)
@@ -760,19 +792,23 @@ class Trainer:
             smooth_loss = get_smooth_loss(norm_disp, color)
 
             loss_without_mask += self.opt.disparity_smoothness * smooth_loss / (2 ** scale)
+            loss_without_edge += self.opt.disparity_smoothness * smooth_loss / (2 ** scale)
 
             loss += self.opt.disparity_smoothness * smooth_loss / (2 ** scale)
+
+
             total_loss += loss
             total_loss_without_mask += loss_without_mask
+            total_loss_without_edge += loss_without_edge
 
             total_loss_within_mask += loss_within_mask
             total_loss_within_mask_dialation_1 += loss_within_mask_dialation_1
             total_loss_within_mask_dialation_3 += loss_within_mask_dialation_3
 
-            # losses["loss/{}".format(scale)] = loss
+        # print("TOTAL", total_edge_loss)
 
-            # losses["total_loss_without_mask/{}".format(scale)] = to_optimise.mean()
-
+        total_edge_loss /= self.num_scales
+        total_loss_without_edge /= self.num_scales
         total_loss_within_mask /= self.num_scales
         total_loss_within_mask_dialation_1 /= self.num_scales
         total_loss_within_mask_dialation_3 /= self.num_scales
@@ -780,19 +816,16 @@ class Trainer:
         total_loss_without_mask /= self.num_scales
         total_attention_weight_loss /= self.num_scales
 
-        # print(total_loss - total_loss_without_mask - (total_attention_weight_loss / self.num_scales))
-        # assert round(total_loss.item() - total_loss_without_mask.item() - (total_attention_weight_loss.item()), 3) == 0, "fout difference is {}".format(total_loss - total_loss_without_mask)
-        # assert self.opt.height % 32 == 0, "'height' must be a multiple of 32"
+        losses["total_loss_without_edge"] = total_loss_without_edge
+        losses["amount_pixels_inside_mask"] = amount_pixels_inside_mask
+        losses["loss_within_attention_mask"] = total_loss_within_mask
+        losses["loss_within_attention_mask_dialation_1"] = total_loss_within_mask_dialation_1
+        losses["loss_within_attention_mask_dialation_3"] = total_loss_within_mask_dialation_3
 
-
-        losses["loss within attention mask"] = total_loss_within_mask
-        losses["loss within attention mask_dialation_1"] = total_loss_within_mask_dialation_1
-        losses["loss within attention mask_dialation_3"] = total_loss_within_mask_dialation_3
-
-        losses["loss without_attention_weight"] = total_loss_without_mask
+        losses["loss_without_attention_weight"] = total_loss_without_mask
         losses["loss"] = total_loss
         losses["total_additional_weight_loss"] = total_attention_weight_loss
-        # losses["edge_loss_total/{}"] = total_edge_loss
+        losses["edge_loss_total/{}"] = total_edge_loss
 
 
         return losses

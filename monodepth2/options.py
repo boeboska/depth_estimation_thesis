@@ -49,7 +49,7 @@ class MonodepthOptions:
         self.parser.add_argument("--edge_detection_threshold",
                                  type=float,
                                  help="The threshold used for canny edge detection. The lower the number the easier it will find edges",
-                                 default=0.2)
+                                 default=0.1)
         self.parser.add_argument("--seed",
                                  type=float,
                                  help="The random seed used for experiments",
@@ -92,8 +92,8 @@ class MonodepthOptions:
 
         self.parser.add_argument("--edge_weight",
                                  type=float,
-                                 help="attention depth weight",
-                                 default=1e-7)
+                                 help="Weight multiplied with the edge loss",
+                                 default=2e-2)
         self.parser.add_argument("--attention_sum",
                                  type = int,
                                  help = "threshold of how big the attention mask may be during training",
