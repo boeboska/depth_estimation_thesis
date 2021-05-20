@@ -51,6 +51,8 @@ from attention_weight_mask import *
 from edge_code import edge_detection_bob_hidde
 # import edge_code as edge_code
 
+import pickle
+
 
 class Trainer:
 
@@ -417,39 +419,61 @@ class Trainer:
 
         return outputs
 
-    def val_all(self):
+
+    def update_dict(self, losses, loss_per_mask_size):
+
+        empty_dict_losses = {
+            'loss': None,
+            'loss_within_attention_mask': None,
+            'loss_within_attention_mask_dialation_1': None,
+            'loss_within_attention_mask_dialation_3': None
+        }
+
+        # if this amount of pixels is not yet seen
+        if losses['amount_pixels_inside_mask'] not in loss_per_mask_size:
+
+            # fill dict with the numbers
+            for key in empty_dict_losses:
+                empty_dict_losses[key] = [losses[key].item()]
+
+            # add to the main dict
+            loss_per_mask_size[losses['amount_pixels_inside_mask']] = empty_dict_losses
+
+        else:
+            # get current dict
+            curr_dict = loss_per_mask_size[losses['amount_pixels_inside_mask']]
+
+            # add values to the current dict
+            for key, value in curr_dict.items():
+                current_list = curr_dict[key]
+                current_list.append(losses[key].item())
+                curr_dict[key] = current_list
+
+            # add the new values to the total dict
+            loss_per_mask_size[losses['amount_pixels_inside_mask']] = curr_dict
+
+        return loss_per_mask_size
+
+    def val_all(self, current_model):
         """Validate on the whole validation set"""
 
         loss_per_mask_size = {}
 
         self.set_eval()
-
+        start = time.time()
         # loop over all the validation images
         for batch_idx, inputs in enumerate(self.val_loader):
             print(batch_idx)
             with torch.no_grad():
-                print("IK BEN HIER")
 
                 outputs, losses = self.process_batch(inputs, batch_idx)
+                loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
 
-                # print(losses)
+        # save the dictionary
+        with open('validation_all/' + current_model + '.pkl', 'wb') as f:
+            pickle.dump(loss_per_mask_size, f, pickle.HIGHEST_PROTOCOL)
 
-                # if that pixel amount was not yet in the dict add a new list
-                if losses['amount_pixels_inside_mask'] not in loss_per_mask_size:
-                    loss_per_mask_size[losses['amount_pixels_inside_mask']] = [ losses['amount_pixels_inside_mask'] ]
-                else:
-                    current_list = loss_per_mask_size[losses['amount_pixels_inside_mask']]
-                    current_list = current_list.append(losses['amount_pixels_inside_mask'])
-                    loss_per_mask_size[losses['amount_pixels_inside_mask']] = current_list
-
-                breakpoint()
-
-
-
-
-
-
-
+        return None
 
     def val(self, inputs, batch_idx):
         """Validate the model on a single minibatch
@@ -635,7 +659,7 @@ class Trainer:
         total_edge_loss = 0
         total_attention_weight_loss = 0
 
-        _, original_attention_masks, loss_inside_mask_tensor, loss_inside_mask_tensor_dialation_1, loss_inside_mask_tensor_dialation_3, amount_pixels_inside_mask= self.prepare_attention_masks(inputs)
+        # _, original_attention_masks, loss_inside_mask_tensor, loss_inside_mask_tensor_dialation_1, loss_inside_mask_tensor_dialation_3, amount_pixels_inside_mask= self.prepare_attention_masks(inputs)
 
                # first determine if you need to calculate the attention mask loss. Then you only have to do this once.
         # this is indepenedned of the scale or frame id.
@@ -684,11 +708,12 @@ class Trainer:
             if self.opt.edge_loss:
 
                 if scale == 0:
+
                     edge_loss = edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, self.device, self.opt.height, self.opt.width, self.opt.log_dir, self.opt.model_name, self.opt.edge_detection_threshold, self.opt.save_plot_every, self.opt.batch_size).to(self.device)
 
-                    loss += self.opt.edge_weight * edge_loss
+                    loss += self.opt.edge_weight * edge_loss * self.num_scales
 
-                    total_edge_loss += self.opt.edge_weight * edge_loss
+                    total_edge_loss += self.opt.edge_weight * edge_loss * self.num_scales
 
                     # add for writing to tensorboard
                     losses["edge_loss/{}".format(scale)] = self.opt.edge_weight * edge_loss
@@ -753,9 +778,9 @@ class Trainer:
             loss_without_edge += to_optimise.mean()
 
             # breakpoint()
-            loss_within_mask += torch.mean(to_optimise * loss_inside_mask_tensor)
-            loss_within_mask_dialation_1 += torch.mean(to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_1).to(self.device))
-            loss_within_mask_dialation_3 += torch.mean(to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_3).to(self.device))
+            # loss_within_mask += torch.mean(to_optimise * loss_inside_mask_tensor)
+            # loss_within_mask_dialation_1 += torch.mean(to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_1).to(self.device))
+            # loss_within_mask_dialation_3 += torch.mean(to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_3).to(self.device))
             # print("@@@", loss_within_mask, loss_within_mask_dialation_1, loss_within_mask_dialation_3)
 
             # multiply the attention mask times the calculated per pixel loss
@@ -806,7 +831,6 @@ class Trainer:
             total_loss_within_mask_dialation_1 += loss_within_mask_dialation_1
             total_loss_within_mask_dialation_3 += loss_within_mask_dialation_3
 
-        # print("TOTAL", total_edge_loss)
 
         total_edge_loss /= self.num_scales
         total_loss_without_edge /= self.num_scales
@@ -818,7 +842,7 @@ class Trainer:
         total_attention_weight_loss /= self.num_scales
 
         losses["total_loss_without_edge"] = total_loss_without_edge
-        losses["amount_pixels_inside_mask"] = amount_pixels_inside_mask
+        # losses["amount_pixels_inside_mask"] = amount_pixels_inside_mask
         losses["loss_within_attention_mask"] = total_loss_within_mask
         losses["loss_within_attention_mask_dialation_1"] = total_loss_within_mask_dialation_1
         losses["loss_within_attention_mask_dialation_3"] = total_loss_within_mask_dialation_3

@@ -16,11 +16,12 @@ from options import MonodepthOptions
 
 def experiment_training():
 
-    # seeds = [0]
-    experiment_names = ["experiment#23"]
+
+    experiment_names = ["experiment#23", "experiment#24", "experiment#25"]
+    edge_weights = [3e-5, 2e-4, 2e-3]
 
 
-    for current_model_name in experiment_names:
+    for current_model_name, edge_weight in zip(experiment_names, edge_weights):
 
         if os.path.exists('output_during_training.txt'):
             os.remove('output_during_training.txt')
@@ -32,10 +33,11 @@ def experiment_training():
         opts = options.parse()
 
         opts.edge_loss = True
+        opts.edge_weight = edge_weight
         opts.model_name = current_model_name
-        opts.batch_size = 6
-        opts.num_workers = 6
-        opts.num_epochs = 6
+        opts.batch_size = 4
+        opts.num_workers = 4
+        opts.num_epochs = 10
 
 
 
@@ -54,5 +56,3 @@ if __name__ == "__main__":
     # # trainer.val_all()
     # trainer.train()
     # except:
-
-
