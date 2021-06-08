@@ -157,6 +157,8 @@ class Trainer:
 
         train_filenames = readlines(fpath.format("train"))
         val_filenames = readlines(fpath.format("val"))
+        test_filesnames = readlines(fpath.format("update_test"))
+
         img_ext = '.png' if self.opt.png else '.jpg'
 
         num_train_samples = len(train_filenames)
@@ -196,6 +198,47 @@ class Trainer:
             num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
 
         self.val_iter = iter(self.val_loader)
+
+
+        test_dataset = self.dataset(
+            self.opt.convolution_experiment,
+            self.opt.top_k,
+            self.opt.seed,
+            self.opt.weight_mask_method,
+            self.opt.weight_matrix_path,
+            self.opt.attention_mask_loss,
+            self.opt.edge_loss,
+            self.opt.data_path,
+            self.opt.attention_path,
+            self.opt.attention_threshold,
+            test_filesnames,
+            self.opt.height,
+            self.opt.width,
+            self.opt.frame_ids,
+            4,
+            is_train=False,
+            img_ext=img_ext)
+        self.test_loader = DataLoader(
+            test_dataset, self.opt.batch_size, True,
+            num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
+
+        self.test_iter = iter(self.test_loader)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         self.writers = {}
         for mode in ["train", "val"]:
@@ -454,24 +497,63 @@ class Trainer:
 
         return loss_per_mask_size
 
-    def val_all(self, current_model):
-        """Validate on the whole validation set"""
+    def test_all(self, current_model):
 
         loss_per_mask_size = {}
 
         self.set_eval()
         start = time.time()
         # loop over all the validation images
-        for batch_idx, inputs in enumerate(self.val_loader):
+        for batch_idx, inputs in enumerate(self.test_loader):
             print(batch_idx)
             with torch.no_grad():
-
                 outputs, losses = self.process_batch(inputs, batch_idx)
                 loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
 
+
         # save the dictionary
-        with open('validation_all/' + current_model + '.pkl', 'wb') as f:
+        with open('validation_all/' + 'test_' + current_model + '.pkl', 'wb') as f:
             pickle.dump(loss_per_mask_size, f, pickle.HIGHEST_PROTOCOL)
+
+        return None
+
+    def val_all(self, current_model):
+        """Validate on the whole validation set"""
+
+        # loss_per_mask_size = {}
+        avg_dialation_size = {}
+        avg_dialation_size["additional_dialation_1"] = []
+        avg_dialation_size["additional_dialation_3"] = []
+        avg_dialation_size["cover_no_dial"] = []
+        avg_dialation_size["cover_dial_1"] = []
+        avg_dialation_size["cover_dial_3"] = []
+
+        self.set_eval()
+        start = time.time()
+        # loop over all the validation images
+        for batch_idx, inputs in enumerate(self.val_loader):
+            # print(batch_idx)
+            if batch_idx % 250 == 0:
+                print(batch_idx)
+            with torch.no_grad():
+
+                outputs, losses = self.process_batch(inputs, batch_idx)
+
+                # breakpoint()
+
+                if "additional_dialation_1" in losses:
+
+
+                    avg_dialation_size["additional_dialation_1"].append(losses["additional_dialation_1"])
+                    avg_dialation_size["additional_dialation_3"].append(losses["additional_dialation_3"])
+                    avg_dialation_size["cover_no_dial"].append(losses["cover_no_dial"])
+                    avg_dialation_size["cover_dial_1"].append(losses["cover_dial_1"])
+                    avg_dialation_size["cover_dial_3"].append(losses["cover_dial_3"])
+
+
+        # save the dictionary
+        with open('validation_all/' + 'dialation_size' +  '.pkl', 'wb') as f:
+            pickle.dump(avg_dialation_size, f, pickle.HIGHEST_PROTOCOL)
 
         return None
 
@@ -631,10 +713,6 @@ class Trainer:
         return attention_mask_weight, original_attention_mask, attention_masks_for_calculating_loss_inside_mask, attention_masks_for_calculating_loss_inside_mask_with_dilation_1, attention_masks_for_calculating_loss_inside_mask_with_dilation_3, amount_pixels_inside_mask
 
 
-
-
-
-
     def compute_losses(self, inputs, outputs, batch_idx):
         """Compute the reprojection and smoothness losses for a minibatch
         """
@@ -659,9 +737,10 @@ class Trainer:
         total_edge_loss = 0
         total_attention_weight_loss = 0
 
-        # _, original_attention_masks, loss_inside_mask_tensor, loss_inside_mask_tensor_dialation_1, loss_inside_mask_tensor_dialation_3, amount_pixels_inside_mask= self.prepare_attention_masks(inputs)
+        _, original_attention_masks, loss_inside_mask_tensor, loss_inside_mask_tensor_dialation_1, loss_inside_mask_tensor_dialation_3, amount_pixels_inside_mask= self.prepare_attention_masks(inputs)
 
-               # first determine if you need to calculate the attention mask loss. Then you only have to do this once.
+
+        # first determine if you need to calculate the attention mask loss. Then you only have to do this once.
         # this is indepenedned of the scale or frame id.
         # batch size , 192, 640
         if self.opt.attention_mask_loss == True:
@@ -778,9 +857,9 @@ class Trainer:
             loss_without_edge += to_optimise.mean()
 
             # breakpoint()
-            # loss_within_mask += torch.mean(to_optimise * loss_inside_mask_tensor)
-            # loss_within_mask_dialation_1 += torch.mean(to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_1).to(self.device))
-            # loss_within_mask_dialation_3 += torch.mean(to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_3).to(self.device))
+            loss_within_mask += torch.mean(to_optimise * loss_inside_mask_tensor)
+            loss_within_mask_dialation_1 += torch.mean(to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_1).to(self.device))
+            loss_within_mask_dialation_3 += torch.mean(to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_3).to(self.device))
             # print("@@@", loss_within_mask, loss_within_mask_dialation_1, loss_within_mask_dialation_3)
 
             # multiply the attention mask times the calculated per pixel loss
@@ -841,8 +920,27 @@ class Trainer:
         total_loss_without_mask /= self.num_scales
         total_attention_weight_loss /= self.num_scales
 
+
+
+        # dial_1 = ((loss_inside_mask_tensor_dialation_1 != 0).sum().item() )
+        # dial_3 = ((loss_inside_mask_tensor_dialation_3 != 0).sum().item() )
+        # no_dial = ((loss_inside_mask_tensor != 0).sum().item() )
+        #
+        # if no_dial > 0:
+        #
+        #     additional_dialation_1 =  (dial_1 - no_dial) / no_dial
+        #     additional_dialation_3 = (dial_3 - no_dial) / no_dial
+        #
+        #     losses["additional_dialation_1"] = additional_dialation_1
+        #     losses["additional_dialation_3"] = additional_dialation_3
+        #
+        #     losses["cover_no_dial"] = no_dial / (self.opt.width * self.opt.height)
+        #     losses["cover_dial_1"] = dial_1 / (self.opt.width * self.opt.height)
+        #     losses["cover_dial_3"] = dial_3 / (self.opt.width * self.opt.height)
+
+
         losses["total_loss_without_edge"] = total_loss_without_edge
-        # losses["amount_pixels_inside_mask"] = amount_pixels_inside_mask
+        losses["amount_pixels_inside_mask"] = amount_pixels_inside_mask
         losses["loss_within_attention_mask"] = total_loss_within_mask
         losses["loss_within_attention_mask_dialation_1"] = total_loss_within_mask_dialation_1
         losses["loss_within_attention_mask_dialation_3"] = total_loss_within_mask_dialation_3

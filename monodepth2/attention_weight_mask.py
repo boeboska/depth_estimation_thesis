@@ -6,6 +6,7 @@ import time
 import seaborn as sns
 import copy
 import itertools
+import matplotlib
 
 
 
@@ -16,23 +17,36 @@ def plot_loss_tensor(self, inputs, to_optimise, attention_mask_weight, batch_idx
     path = self.opt.log_dir + self.opt.model_name + "/" + "loss_tensor_visualization/"
     if not os.path.exists(path):
         os.makedirs(path)
+    print("path", path)
 
-    fig, axis = plt.subplots(5, 2, figsize=(45, 20))
+    fig, axis = plt.subplots(5, 2, figsize=(30, 20))
+
+    font = {'family': 'normal',
+            'weight': 'bold',
+            'size': 25}
+
+    matplotlib.rc('font', **font)
+
 
     original_img = inputs["color_aug", 0, 0]
 
     original_img = np.array(original_img[0].squeeze().cpu().detach().permute(1, 2, 0).numpy())
 
-    axis[0, 0].title.set_text('original kitti image')
+    # axis[0, 0].title.set_text('Kitti image')
+    axis[0 ,0].set_title('Kitti image', fontdict={'fontsize': 20, 'fontweight': 'bold'})
     axis[0, 0].axis('off')
     axis[0, 0 ].imshow(original_img)
 
     # create the heatmap
-    axis[0, 1].title.set_text(f'mean original loss{round(to_optimise[0].mean().item(),2)}')
+    # axis[0, 1].title.set_text(f'mean original loss{round(to_optimise[0].mean().item(),2)}')
+    # axis[0, 1].title.set_text('Monodepth loss')
+    axis[0, 1].set_title('Monodepth loss', fontdict={'fontsize': 20, 'fontweight': 'bold'})
     axis[0, 1].axis('off')
     sns.heatmap(to_optimise[0].cpu().squeeze(0).detach(), ax=axis[0, 1], vmin=0, vmax=0.6, cmap='Greens', center=1)
 
-    axis[1, 0].title.set_text(f'Our weight matrix first mean{round(attention_mask_weight[0].mean().item(), 2)}')
+    # axis[1, 0].title.set_text(f'Our weight matrix first mean{round(attention_mask_weight[0].mean().item(), 2)}')
+    # axis[1, 0].title.set_text('Weight mask before pre processing')
+    axis[1, 0].set_title('Weight mask before pre processing', fontdict={'fontsize': 20, 'fontweight': 'bold'})
     axis[1, 0].axis('off')
     sns.heatmap(attention_mask_weight[0].cpu().squeeze(0).detach(), ax=axis[1, 0], vmin=0, vmax=1.2, cmap='Greens', center=1)
 
@@ -45,14 +59,16 @@ def plot_loss_tensor(self, inputs, to_optimise, attention_mask_weight, batch_idx
     # sns.heatmap(attention_mask_weight.cpu().squeeze(0).detach(), ax=axis[3], vmin=1, vmax=1.2, cmap='Greens', center=1)
     # breakpoint()
 
-    # alle pixel waarden tot aan 1.05 map maar 1
+    # alle pixel waarden tot aan 1.05 map maar 0.8
     attention_mask_weight[attention_mask_weight <= self.opt.attention_mask_threshold] = self.opt.reduce_attention_weight
 
     # geef extra weight mee aan pixels die nog over zijn geblevenaa
     attention_mask_weight[attention_mask_weight > 1] = attention_mask_weight[attention_mask_weight > 1] * self.opt.attention_weight
 
 
-    axis[1, 1].title.set_text(f'Our weight matrix daarna mean  { round(attention_mask_weight[0].mean().item(), 2)}')
+    # axis[1, 1].title.set_text(f'Our weight matrix daarna mean  { round(attention_mask_weight[0].mean().item(), 2)}')
+    # axis[1, 1].title.set_text('Weight mask after pre processing')
+    axis[1, 1].set_title('Weight mask after pre processing', fontdict={'fontsize': 20, 'fontweight': 'bold'})
     axis[1, 1].axis('off')
     sns.heatmap(attention_mask_weight[0].cpu().squeeze(0).detach(), ax=axis[1, 1], vmin=0, vmax=1.2,
                 cmap='Greens', center=1)
@@ -72,7 +88,9 @@ def plot_loss_tensor(self, inputs, to_optimise, attention_mask_weight, batch_idx
 
     to_optimise = to_optimise * attention_mask_weight
 
-    axis[2, 0].title.set_text(f'mean loss after multiplication{round(to_optimise[0].mean().item(),2)}')
+    # axis[2, 0].title.set_text(f'mean loss after multiplication{round(to_optimise[0].mean().item(),2)}')
+    # axis[2, 0].title.set_text('Monodepth loss times weight mask')
+    axis[2, 0].set_title('Monodepth loss times weight mask', fontdict={'fontsize': 20, 'fontweight': 'bold'})
     sns.heatmap(to_optimise[0].cpu().squeeze(0).detach(), ax=axis[2, 0], vmin=0, vmax=0.6, cmap='Greens', center=1)
     axis[2, 0].axis('off')
 

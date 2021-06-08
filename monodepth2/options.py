@@ -87,7 +87,7 @@ class MonodepthOptions:
         self.parser.add_argument("--reduce_attention_weight",
                                  type=float,
                                  help="map attention weight numbers to this number based on filter rule",
-                                 default=1)
+                                 default=0.8)
 
 
         self.parser.add_argument("--edge_weight",
@@ -98,6 +98,11 @@ class MonodepthOptions:
                                  type = int,
                                  help = "threshold of how big the attention mask may be during training",
                                  default = 12500)
+
+        self.parser.add_argument("--labels_inside_mask",
+                                 type = bool,
+                                 help = "Only calculate the labels inside the attention masks",
+                                 default = False)
 
         # PATHS
         self.parser.add_argument("--data_path",
