@@ -157,7 +157,7 @@ class Trainer:
 
         train_filenames = readlines(fpath.format("train"))
         val_filenames = readlines(fpath.format("val"))
-        test_filesnames = readlines(fpath.format("update_test"))
+        # test_filesnames = readlines(fpath.format("test"))
 
         img_ext = '.png' if self.opt.png else '.jpg'
 
@@ -200,30 +200,30 @@ class Trainer:
         self.val_iter = iter(self.val_loader)
 
 
-        test_dataset = self.dataset(
-            self.opt.convolution_experiment,
-            self.opt.top_k,
-            self.opt.seed,
-            self.opt.weight_mask_method,
-            self.opt.weight_matrix_path,
-            self.opt.attention_mask_loss,
-            self.opt.edge_loss,
-            self.opt.data_path,
-            self.opt.attention_path,
-            self.opt.attention_threshold,
-            test_filesnames,
-            self.opt.height,
-            self.opt.width,
-            self.opt.frame_ids,
-            4,
-            is_train=False,
-            img_ext=img_ext)
-        self.test_loader = DataLoader(
-            test_dataset, self.opt.batch_size, True,
-            num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
-
-        self.test_iter = iter(self.test_loader)
-
+        # test_dataset = self.dataset(
+        #     self.opt.convolution_experiment,
+        #     self.opt.top_k,
+        #     self.opt.seed,
+        #     self.opt.weight_mask_method,
+        #     self.opt.weight_matrix_path,
+        #     self.opt.attention_mask_loss,
+        #     self.opt.edge_loss,
+        #     self.opt.data_path,
+        #     self.opt.attention_path,
+        #     self.opt.attention_threshold,
+        #     test_filesnames,
+        #     self.opt.height,
+        #     self.opt.width,
+        #     self.opt.frame_ids,
+        #     4,
+        #     is_train=False,
+        #     img_ext=img_ext)
+        # self.test_loader = DataLoader(
+        #     test_dataset, self.opt.batch_size, True,
+        #     num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
+        #
+        # self.test_iter = iter(self.test_loader)
+        #
 
 
 
