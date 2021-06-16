@@ -23,15 +23,14 @@ def edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, device, height, 
     attention_masks_plot = attention_masks
 
     disp = outputs[("disp", scale)]
-    # upsample to kitti size for correct multiplication with attention_mask
-    disp = F.interpolate(
-        disp, [height, width], mode="bilinear", align_corners=False)
+
 
     for b in range(batch_size):
 
         # cast to int for correct canny input
         depth_mask = np.uint8(disp[b].squeeze().cpu().detach().numpy() * 255)
 
+        # dit zijn alle edges gevonden over het gehele diepte plaatje
         edges_disp = torch.from_numpy(cv2.Canny(depth_mask, edge_detection_threshold * 255, edge_detection_threshold * 255,
                                apertureSize=3, L2gradient=False))
 
@@ -41,9 +40,14 @@ def edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, device, height, 
             if attention_mask.sum().item() == 0:
                 break
 
-            edges_per_attention_mask = attention_mask.cpu() * edges_disp.to(torch.float32).cpu()
+            kernel = np.ones((3, 3), np.uint8)
+            attention_mask = np.uint8(attention_mask.cpu().detach().numpy())
+            attention_mask_light = cv2.erode(attention_mask, kernel, iterations=3)
 
-            # if sum ==0 then the found edges from attention mask are not yet in the overall edges
+            # these are the edges inside the attention mask
+            edges_per_attention_mask = torch.tensor(attention_mask_light).to(torch.float32) * edges_disp.to(torch.float32).cpu()
+
+            # if sum == 0 then the found edges from attention mask are not yet in the overall edges
             if (edges_per_attention_mask * edges_overall[b]).sum().item() == 0 and (edges_per_attention_mask > 0).any():
 
                 edges_overall[b] += (edges_per_attention_mask / 255)
@@ -54,31 +58,40 @@ def edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, device, height, 
 
                     original_img = np.array(original_img.squeeze().cpu().detach().permute(1, 2, 0).numpy())
 
-                    fig, axis = plt.subplots(6, 1, figsize=(12, 12))
-                    axis[0].imshow(attention_mask.cpu().detach().numpy())
-                    axis[0].title.set_text('attention maske')
-                    axis[1].imshow(edges_per_attention_mask.cpu().detach().numpy() / 255)
-                    axis[1].title.set_text(f'edge per attentio mask SUM {edges_per_attention_mask.sum()}')
-                    axis[2].imshow(edges_overall[b].cpu().detach().numpy())
-                    axis[2].title.set_text(f'ALLES SUM {edges_overall[b].sum()}')
+                    fig, axis = plt.subplots(7, 1, figsize=(12, 12))
+                    axis[0].imshow(attention_mask)
+                    axis[0].title.set_text(f'attention mask sum {attention_mask.sum()}')
 
-                    axis[3].imshow(original_img)
-                    axis[3].title.set_text('Original image')
-                    axis[3].axis('off')
 
-                    axis[4].imshow(disp[b].squeeze(0).squeeze(0).cpu().detach().numpy())
-                    axis[4].title.set_text('depth imagw')
+                    axis[1].imshow(attention_mask_light)
+                    axis[1].title.set_text(f'edge na erosion {attention_mask_light.sum()}')
+
+                    axis[2].imshow(edges_per_attention_mask.cpu().detach().numpy() / 255)
+                    axis[2].title.set_text(f'edge per attentio mask SUM {edges_per_attention_mask.sum() / 255}')
+
+
+                    axis[3].imshow(edges_overall[b].cpu().detach().numpy())
+                    axis[3].title.set_text(f'ALLES SUM {edges_overall[b].sum()}')
+
+                    axis[4].imshow(original_img)
+                    axis[4].title.set_text('Original image')
                     axis[4].axis('off')
 
-                    axis[5].imshow(edges_disp / 255)
-                    axis[5].title.set_text('edges')
+                    axis[5].imshow(disp[b].squeeze(0).squeeze(0).cpu().detach().numpy())
+                    axis[5].title.set_text('depth imagw')
                     axis[5].axis('off')
+
+                    axis[6].imshow(edges_disp / 255)
+                    axis[6].title.set_text('edges')
+                    axis[6].axis('off')
+
+                    print("save", path)
 
                     fig.savefig(
                         '{}/batchIDX_{}_threshold_{}_i_{}_scale{}.png'.format(path, batch_idx,
                                                                           edge_detection_threshold, i, scale))
                     plt.close('all')
-        # breakpoint()
+
     return edges_overall.sum()
 
 def edge_detection_loss(self, scale, outputs, inputs, attention_mask, batch_idx, index_nrs_not_overlapping,

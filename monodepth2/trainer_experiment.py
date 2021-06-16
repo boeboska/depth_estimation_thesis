@@ -520,16 +520,19 @@ class Trainer:
     def val_all(self, current_model):
         """Validate on the whole validation set"""
 
-        # loss_per_mask_size = {}
-        avg_dialation_size = {}
-        avg_dialation_size["additional_dialation_1"] = []
-        avg_dialation_size["additional_dialation_3"] = []
-        avg_dialation_size["cover_no_dial"] = []
-        avg_dialation_size["cover_dial_1"] = []
-        avg_dialation_size["cover_dial_3"] = []
+        loss_per_mask_size = {}
+
+
+        # avg_dialation_size = {}
+        # avg_dialation_size["additional_dialation_1"] = []
+        # avg_dialation_size["additional_dialation_3"] = []
+        # avg_dialation_size["cover_no_dial"] = []
+        # avg_dialation_size["cover_dial_1"] = []
+        # avg_dialation_size["cover_dial_3"] = []
 
         self.set_eval()
         start = time.time()
+
         # loop over all the validation images
         for batch_idx, inputs in enumerate(self.val_loader):
             # print(batch_idx)
@@ -540,20 +543,12 @@ class Trainer:
                 outputs, losses = self.process_batch(inputs, batch_idx)
 
                 # breakpoint()
-
-                if "additional_dialation_1" in losses:
-
-
-                    avg_dialation_size["additional_dialation_1"].append(losses["additional_dialation_1"])
-                    avg_dialation_size["additional_dialation_3"].append(losses["additional_dialation_3"])
-                    avg_dialation_size["cover_no_dial"].append(losses["cover_no_dial"])
-                    avg_dialation_size["cover_dial_1"].append(losses["cover_dial_1"])
-                    avg_dialation_size["cover_dial_3"].append(losses["cover_dial_3"])
+                loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
 
 
         # save the dictionary
-        with open('validation_all/' + 'dialation_size' +  '.pkl', 'wb') as f:
-            pickle.dump(avg_dialation_size, f, pickle.HIGHEST_PROTOCOL)
+        with open('validation_all/' + current_model +  '.pkl', 'wb') as f:
+            pickle.dump(loss_per_mask_size, f, pickle.HIGHEST_PROTOCOL)
 
         return None
 
@@ -839,7 +834,9 @@ class Trainer:
             if not self.opt.disable_automasking:
                 # add random numbers to break ties
                 identity_reprojection_loss += torch.randn(
-                    identity_reprojection_loss.shape).cuda() * 0.00001
+                    identity_reprojection_loss.shape).to(self.device) * 0.00001
+
+                # if self.opt.no_cuda cpu() else cuda()
 
                 combined = torch.cat((identity_reprojection_loss, reprojection_loss), dim=1)
             else:
@@ -853,16 +850,82 @@ class Trainer:
                 to_optimise, idxs = torch.min(combined, dim=1)
 
 
+
+
+
             loss_without_mask += to_optimise.mean()
             loss_without_edge += to_optimise.mean()
 
-            # breakpoint()
-            loss_within_mask += torch.mean(to_optimise * loss_inside_mask_tensor)
-            loss_within_mask_dialation_1 += torch.mean(to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_1).to(self.device))
-            loss_within_mask_dialation_3 += torch.mean(to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_3).to(self.device))
-            # print("@@@", loss_within_mask, loss_within_mask_dialation_1, loss_within_mask_dialation_3)
+            # temp = to_optimise * loss_inside_mask_tensor
+            # loss_within_mask += torch.mean( temp [temp > 0] )
+            #
+            #
+            # temp = to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_1).to(self.device)
+            # loss_within_mask_dialation_1 += torch.mean( temp [temp > 0] )
+            #
+            #
+            # temp = to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_3).to(self.device)
+            # loss_within_mask_dialation_3 += torch.mean( temp [temp > 0] )
 
-            # multiply the attention mask times the calculated per pixel loss
+
+            # if amount_pixels_inside_mask > 8000 and scale == 0 or amount_pixels_inside_mask < 2000 and scale == 0:
+            #
+            #     # print(amount_pixels_inside_mask)
+            #
+            #     path = self.opt.log_dir + self.opt.model_name + "/" + "big_img_visualization/"
+            #     if not os.path.exists(path):
+            #         os.makedirs(path)
+            #
+            #
+            #     fig, axis = plt.subplots(4, 1, figsize=(30, 20))
+            #
+            #     original_img = inputs["color_aug", 0, 0]
+            #
+            #     original_img = np.array(original_img[0].squeeze().cpu().detach().permute(1, 2, 0).numpy())
+            #
+            #     # axis[0, 0].title.set_text('Kitti image')
+            #     axis[0].set_title('Kitti image', fontdict={'fontsize': 20, 'fontweight': 'bold'})
+            #     axis[0].axis('off')
+            #     axis[0].imshow(original_img)
+            #
+            #     axis[1].set_title(f'Monodepth loss: {round(to_optimise.mean().item(), 2)}', fontdict={'fontsize': 20, 'fontweight': 'bold'})
+            #     axis[1].axis('off')
+            #     sns.heatmap(to_optimise[0].cpu().squeeze(0).detach(), ax=axis[1], vmin=0, vmax=0.6, cmap='Greens',
+            #                 center=1)
+            #
+            #     # breakpoint()
+            #     axis[2].set_title(f'Attention mask: {amount_pixels_inside_mask}', fontdict={'fontsize': 20, 'fontweight': 'bold'})
+            #     axis[2].axis('off')
+            #     sns.heatmap(attention_mask_weight.cpu().squeeze(0).detach(), ax=axis[2], vmin=1, vmax=1.2, cmap='Greens',
+            #                 center=1)
+            #
+            #     # breakpoint()
+            #     temp = to_optimise * loss_inside_mask_tensor
+            #
+            #
+            #     axis[3].set_title(f'Monodepth loss inside mask: {round(torch.mean(temp[temp > 0]).item(), 3)}', fontdict={'fontsize': 20, 'fontweight': 'bold'})
+            #     axis[3].axis('off')
+            #     sns.heatmap(temp.cpu().squeeze(0).detach(), ax=axis[3], vmin=0, vmax=0.6, cmap='Greens',
+            #                 center=1)
+            #
+            #     plt.show()
+            #
+            #     fig.savefig(f'{path}/batch_idx_{batch_idx, scale, amount_pixels_inside_mask}.png')
+            #     plt.close(fig)
+            #
+            #
+            #
+
+
+
+
+
+
+
+
+
+
+
             if self.opt.attention_mask_loss:
                 """ if reprojection loss is higher then the identity loss then this is due to no camera motion or moving objects at same speed.
                 for these pixels we use the identity loss such that the loss is lower and no noise to the model
