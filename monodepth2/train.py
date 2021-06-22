@@ -28,8 +28,6 @@ def experiment_training():
         file = open(f'log {current_model_name}.txt', 'w')
 
 
-
-
         options = MonodepthOptions()
         opts = options.parse()
 
@@ -48,11 +46,11 @@ def experiment_training():
             traceback.print_exc(file=file)
 
 if __name__ == "__main__":
-    experiment_training()
-    # options = MonodepthOptions()
-    # opts = options.parse()
-    # trainer = Trainer(opts)
-    # # try:
-    # # trainer.val_all()
-    # trainer.train()
+    # experiment_training()
+    options = MonodepthOptions()
+    opts = options.parse()
+    trainer = Trainer(opts)
+    # try:
+    # trainer.val_all()
+    trainer.train()
     # # except:

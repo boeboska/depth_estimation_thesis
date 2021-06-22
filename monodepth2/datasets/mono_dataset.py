@@ -17,13 +17,8 @@ import torch.utils.data as data
 from torchvision import transforms
 
 
-
-
-
-
 def pil_loader(path):
-    # open path as file to avoid ResourceWarning
-    # (https://github.com/python-pillow/Pillow/issues/835)
+
     with open(path, 'rb') as f:
         with Image.open(f) as img:
             return img.convert('RGB')
@@ -209,6 +204,9 @@ class MonoDataset(data.Dataset):
                 other_side = {"r": "l", "l": "r"}[side]
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index, other_side, do_flip)
             else:
+
+                # print("hier", frame_index)
+
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index + i, side, do_flip)
 
                 if i == 0:

@@ -34,6 +34,68 @@ def edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, device, height, 
         edges_disp = torch.from_numpy(cv2.Canny(depth_mask, edge_detection_threshold * 255, edge_detection_threshold * 255,
                                apertureSize=3, L2gradient=False))
 
+        edges_disp_0_05 = torch.from_numpy(cv2.Canny(depth_mask, 0.05 * 255, 0.05 * 255,
+                               apertureSize=3, L2gradient=False))
+
+        edges_disp_0_20 = torch.from_numpy(cv2.Canny(depth_mask, 0.2 * 255, 0.2 * 255,
+                               apertureSize=3, L2gradient=False))
+
+        # if batch_idx % save_plot_every == 0 and b == 0:
+        original_img = inputs["color_aug", 0, 0][b]
+
+        original_img = np.array(original_img.squeeze().cpu().detach().permute(1, 2, 0).numpy())
+
+
+        path_edge_threshold = "edge_img_for_thesis/edge_threshold/"
+        if not os.path.exists(path_edge_threshold):
+            print("PATH NOT EXSIST")
+            os.makedirs(path_edge_threshold)
+
+        print(path_edge_threshold)
+
+        fig, axis = plt.subplots(5, 1, figsize=(12, 12))
+
+        font_nr = 20
+
+        axis[0].imshow(original_img)
+        axis[0].set_title('Kitti image', fontsize=font_nr)
+        # axis[0].title.set_text('Original image')
+        axis[0].axis('off')
+
+        axis[1].imshow(disp[b].squeeze(0).squeeze(0).cpu().detach().numpy())
+        axis[1].set_title('Depth image', fontsize=font_nr)
+        # axis[1].title.set_text('depth image')
+        axis[1].axis('off')
+
+        axis[2].imshow(edges_disp_0_05 / 255)
+        axis[2].set_title('Edge detection threshold 0.05', fontsize=font_nr)
+        # axis[2].title.set_text('edges threshold 0.05')
+        axis[2].axis('off')
+
+        axis[3].set_title('Edge detection threshold 0.1', fontsize=font_nr)
+        axis[3].imshow(edges_disp / 255)
+        # axis[3].title.set_text('edges threshold 0.1')
+        axis[3].axis('off')
+
+        axis[4].imshow(edges_disp_0_20 / 255)
+        axis[4].set_title('Edge detection threshold 0.2', fontsize=font_nr)
+        # axis[4].title.set_text('edges threshold 0.2')
+        axis[4].axis('off')
+
+        fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=.4)
+
+        fig.savefig(
+            '{}/batchIDX_{}_threshold_{}_scale{}.png'.format(path_edge_threshold, batch_idx,
+                                                                  edge_detection_threshold, scale))
+        plt.close('all')
+
+
+
+
+
+
+
+
         for i, attention_mask in enumerate(attention_masks[b].squeeze(dim=0)):
 
             # the last x attention masks are zeros so skip them
@@ -46,6 +108,9 @@ def edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, device, height, 
 
             # these are the edges inside the attention mask
             edges_per_attention_mask = torch.tensor(attention_mask_light).to(torch.float32) * edges_disp.to(torch.float32).cpu()
+
+
+
 
             # if sum == 0 then the found edges from attention mask are not yet in the overall edges
             if (edges_per_attention_mask * edges_overall[b]).sum().item() == 0 and (edges_per_attention_mask > 0).any():
@@ -85,7 +150,7 @@ def edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, device, height, 
                     axis[6].title.set_text('edges')
                     axis[6].axis('off')
 
-                    print("save", path)
+                    # print("save", path)
 
                     fig.savefig(
                         '{}/batchIDX_{}_threshold_{}_i_{}_scale{}.png'.format(path, batch_idx,

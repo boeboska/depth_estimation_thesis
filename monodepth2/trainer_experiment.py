@@ -86,6 +86,8 @@ class Trainer:
 
         self.use_pose_net = not (self.opt.use_stereo and self.opt.frame_ids == [0])
 
+        # breakpoint()
+
         if self.opt.use_stereo:
             self.opt.frame_ids.append("s")
 
@@ -384,11 +386,15 @@ class Trainer:
         else:
 
             if self.opt.top_k > 0:
+                # feed the three kitti images to the decoder
+                # breakpoint()
                 features = self.models["encoder"](inputs["color_aug", 0, 0], masks = inputs['top_k_masks'])
 
             else:
                 # Otherwise, we only feed the image with frame_id 0 through the depth encoder
+                # breakpoint()
                 features = self.models["encoder"](inputs["color_aug", 0, 0])
+                # breakpoint()
             outputs = self.models["depth"](features)
 
         # FALSE

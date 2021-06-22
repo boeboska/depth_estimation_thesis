@@ -48,6 +48,8 @@ class KITTIDataset(MonoDataset):
         return os.path.isfile(velo_filename)
 
     def get_color(self, folder, frame_index, side, do_flip):
+
+
         color = self.loader(self.get_image_path(folder, frame_index, side))
 
         if do_flip:
@@ -189,10 +191,18 @@ class KITTIRAWDataset(KITTIDataset):
         super(KITTIRAWDataset, self).__init__(*args, **kwargs)
 
     def get_image_path(self, folder, frame_index, side):
+
+        # print("frame index", frame_index)
+
+
         f_str = "{:010d}{}".format(frame_index, self.img_ext)
+
+        # print("f str", f_str)
+
         image_path = os.path.join(
             self.data_path, folder, "image_0{}/data".format(self.side_map[side]), f_str)
 
+        # print("IMG PATH", image_path)
         # print("IMG PATH", image_path)
         return image_path
 
