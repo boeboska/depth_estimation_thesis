@@ -18,11 +18,16 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib
 matplotlib.use('Agg')
+from scipy.interpolate import LinearNDInterpolator
+
+
 
 cv2.setNumThreads(0)  # This speeds up evaluation 5x on our unix systems (OpenCV 3.3.1)
 
 
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
+
+
 
 # Models which were trained with stereo supervision were trained with a nominal
 # baseline of 0.1 units. The KITTI rig has a baseline of 54cm. Therefore,
@@ -30,9 +35,91 @@ splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 STEREO_SCALE_FACTOR = 5.4
 
 
+# plot_overview(current_kitti, original_attention_mask, casted_attention_mask, pred_disps[i], gt, )
+
+
+def plot_overview(original_kitti, original_attention_mask, casted_attention_mask, pred_disps, gt_depth, mask, i, original_mask):
+    fig, axis = plt.subplots(3, 2, figsize=(18, 9.5))
+
+    current_kitti = original_kitti
+    current_kitti = np.swapaxes(current_kitti, 0, 1)
+    current_kitti = np.swapaxes(current_kitti, 1, 2)
+
+    font_nr = 15
+
+    # axis[0].title.set_text('Original Kitti Image')
+    axis[0, 0].set_title('Kitti image', fontdict={'fontsize': font_nr})
+    axis[0, 0].axis('off')
+    axis[0, 0].imshow(current_kitti)
+
+    # create the heatmap
+    # axis[1].title.set_text('Weight mask before pre processing')
+    # axis[1].set_title('Attention mask', fontsize=font_nr)
+    axis[0, 1].set_title('Weight mask before pre processing', fontdict={'fontsize': font_nr})
+    axis[0, 1].axis('off')
+    sns.heatmap(original_attention_mask, ax=axis[0, 1], vmin=1, vmax=1.2, cmap='Greens', center=1, cbar=False)
+
+    # axis[2].set_title('Weight mask after pre processing', fontdict={'fontsize': 20, 'fontweight': 'bold'})
+    axis[1,1].set_title('Weight mask after pre processing', fontdict={'fontsize': font_nr})
+    # axis[2].title.set_text('Weight mask before pre processing')
+    axis[1,1].axis('off')
+    sns.heatmap(casted_attention_mask, ax=axis[1,1], vmin=0.8, vmax=1.2, cmap='Greens', center=1, cbar=False)
+
+    # axis[3].set_title('Depth prediction', fontdict={'fontsize': 20})
+    # # axis[3].title.set_text('Depth prediction')
+    # axis[3].axis('off')
+    # axis[3].imshow(pred_disps)
+
+    depth_map = gt_depth / 256
+    x, y = np.where(depth_map > 0)
+    d = depth_map[depth_map != 0]
+
+    xyd = np.stack((y, x, d)).T
+
+    gt = lin_interp(depth_map.shape, xyd)
+
+    axis[1,0].set_title('Depth label', fontdict={'fontsize': font_nr})
+    # axis[4].title.set_text('LABEL')
+    axis[1,0].axis('off')
+    axis[1,0].imshow(gt, cmap='plasma')
+
+    axis[2,0].set_title('Depth label', fontdict={'fontsize': font_nr})
+    # axis[5].title.set_text('Values left over')
+    axis[2,0].axis('off')
+    sns.heatmap(torch.tensor(original_mask).to(torch.float32), ax=axis[2,0], vmin=0.8, vmax=1.2, cmap='Greens', center=1, cbar=False)
+
+    update_mask = torch.tensor(mask).to(torch.float32)
+
+    axis[2,1].set_title('Depth values inside attention mask', fontdict={'fontsize': font_nr})
+    # axis[6].title.set_text('Values left over with attention mask')
+    axis[2,1].axis('off')
+    sns.heatmap(update_mask, ax=axis[2,1], vmin=0.8, vmax=1.2, cmap='Greens', center=1, cbar=False)
+
+    fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=.4)
+
+    fig.savefig('depth_evaluation_thesis_plot/{}'.format(i))
+    plt.close('all')
+    # breakpoint()
+
+
+
+def lin_interp(shape, xyd):
+    # taken from https://github.com/hunse/kitti
+    m, n = shape
+    ij, d = xyd[:, 1::-1], xyd[:, 2]
+    f = LinearNDInterpolator(ij, d, fill_value=0)
+    J, I = np.meshgrid(np.arange(n), np.arange(m))
+    IJ = np.vstack([I.flatten(), J.flatten()]).T
+    disparity = f(IJ).reshape(shape)
+    return disparity
+
+
 def compute_errors(gt, pred):
     """Computation of error metrics between predicted and ground truth depths
     """
+
+
+
     thresh = np.maximum((gt / pred), (pred / gt))
     a1 = (thresh < 1.25     ).mean()
     a2 = (thresh < 1.25 ** 2).mean()
@@ -44,7 +131,7 @@ def compute_errors(gt, pred):
     rmse_log = (np.log(gt) - np.log(pred)) ** 2
     rmse_log = np.sqrt(rmse_log.mean())
 
-    abs_rel = np.mean(np.abs(gt - pred) / gt)
+    abs_rel = np.mean( np.abs(gt - pred) / gt)
 
     sq_rel = np.mean(((gt - pred) ** 2) / gt)
 
@@ -65,6 +152,8 @@ def batch_post_process_disparity(l_disp, r_disp):
 def evaluate(opt):
     """Evaluates a pretrained model using a specified test set
     """
+
+
     MIN_DEPTH = 1e-3
     MAX_DEPTH = 80
 
@@ -86,7 +175,7 @@ def evaluate(opt):
 
         encoder_dict = torch.load(encoder_path)
         # breakpoint()
-        dataset = datasets.KITTIRAWDataset(opt.convolution_experiment, opt.top_k,opt.seed, opt.weight_mask_method, opt.weight_matrix_path, opt.attention_mask_loss, opt.edge_loss,  opt.data_path, opt.attention_path, opt.attention_threshold, filenames,
+        dataset = datasets.KITTIRAWDataset(opt.convolution_experiment, opt.top_k, opt.seed, opt.weight_mask_method, opt.weight_matrix_path, opt.attention_mask_loss, opt.edge_loss,  opt.data_path, opt.attention_path, opt.attention_threshold, filenames,
                                            encoder_dict['height'], encoder_dict['width'],
                                            [0], 4, img_ext='.png'if opt.png else '.jpg', is_train=False)
 
@@ -106,7 +195,8 @@ def evaluate(opt):
         depth_decoder.eval()
 
         pred_disps = []
-        attention_masks = []
+        original_attention_masks = []
+        casted_attention_masks = []
         original_kitti = []
 
         print("-> Computing predictions with size {}x{}".format(
@@ -118,6 +208,16 @@ def evaluate(opt):
 
                 print(i / len(dataloader))
                 input_color = data[("color", 0, 0)].cuda()
+
+                weight_masks = data['weight_matrix'].clone()
+
+                # value < 1.05 to 0
+                weight_masks[weight_masks <= 1.05] = 0
+
+                # > 1 = 1
+                weight_masks[weight_masks > 1] = 1
+
+            # breakpoint()
 
                 # FALSE
                 if opt.post_process:
@@ -135,11 +235,80 @@ def evaluate(opt):
                     pred_disp = batch_post_process_disparity(pred_disp[:N], pred_disp[N:, :, ::-1])
 
                 pred_disps.append(pred_disp)
+                casted_attention_masks.append(weight_masks)
+
+                original_masks = data['weight_matrix'].clone()
+                original_attention_masks.append(original_masks)
+                original_kitti.append(input_color.cpu())
+
+                # breakpoint()
+                if i ==1:
+                    break
 
         # AMOUNT IMG, 192, 640
+        original_attention_masks = np.concatenate(original_attention_masks)
         pred_disps = np.concatenate(pred_disps)
+        casted_attention_masks = np.concatenate(casted_attention_masks)
+        original_kitti = np.concatenate(original_kitti)
 
+        gt_path = os.path.join(splits_dir, opt.eval_split, "gt_depths.npz")
+        gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1', allow_pickle=True)["data"]
+        # breakpoint()
 
+        # for image in range(pred_disps.shape[0]):
+        #
+        #
+        #
+        #
+        #     fig, axis = plt.subplots(5, 1, figsize=(16, 16))
+        #
+        #
+        #
+        #     depth_image = pred_disps[image]
+        #
+        #     current_kitti = original_kitti[image]
+        #     current_kitti = np.swapaxes(current_kitti, 0, 1)
+        #     current_kitti = np.swapaxes(current_kitti, 1, 2)
+        #
+        #
+        #     axis[0].title.set_text('Original Kitti Image')
+        #     axis[0].axis('off')
+        #     axis[0].imshow(current_kitti)
+        #
+        #     # create the heatmap
+        #     axis[1].title.set_text('Attention mask weight')
+        #     axis[1].axis('off')
+        #     sns.heatmap(attention_masks[image], ax=axis[1], vmin=1, vmax=1.2, cmap='Greens', center=1)
+        #
+        #
+        #     axis[2].title.set_text('Depth image')
+        #     axis[2].axis('off')
+        #     axis[2].imshow(depth_image)
+        #
+        #
+        #     depth_map = gt_depths[image]
+        #
+        #     depth_map = depth_map / 256
+        #
+        #     # breakpoint()
+        #     x, y = np.where(depth_map > 0)
+        #     d = depth_map[depth_map != 0]
+        #
+        #     xyd = np.stack((y, x, d)).T
+        #
+        #     gt = lin_interp(depth_map.shape, xyd)
+        #
+        #     axis[3].title.set_text('Input')
+        #     axis[3].axis('off')
+        #     axis[3].imshow(depth_map, cmap='plasma')
+        #
+        #     axis[4].title.set_text('Ground Truth')
+        #     axis[4].axis('off')
+        #     axis[4].imshow(gt, cmap='plasma')
+        #
+        #     fig.savefig('depth_evaluation/{}'.format(image))
+
+    # FALSE
     else:
         # Load predictions from file
         print("-> Loading predictions from {}".format(opt.ext_disp_to_eval))
@@ -161,6 +330,7 @@ def evaluate(opt):
     if opt.no_eval:
         print("-> Evaluation disabled. Done.")
         quit()
+
     # EIGEN
     elif opt.eval_split == 'benchmark':
         save_dir = os.path.join(opt.load_weights_folder, "benchmark_predictions")
@@ -199,6 +369,33 @@ def evaluate(opt):
     errors = []
     ratios = []
 
+    # breakpoint()
+    # for i, depth_map in enumerate(gt_depths):
+    #     depth_map = depth_map[1] / 256
+    #     x, y = np.where(depth_map > 0)
+    #     d = depth_map[depth_map != 0]
+    #
+    #     xyd = np.stack((y, x, d)).T
+    #
+    #     gt = lin_interp(depth_map.shape, xyd)
+    #
+    #     fig, axis = plt.subplots(3, 1, figsize=(16, 16))
+    #     axis[0].title.set_text('Original Kitti Image')
+    #     axis[0].axis('off')
+    #     axis[0].imshow(current_kitti)
+    #
+    #     plt.figure(figsize=(10, 10))
+    #     plt.imshow(depth_map, cmap='plasma')
+    #     plt.title("Input", fontsize=22)
+    #     plt.show()
+    #
+    #     plt.figure(figsize=(10, 10))
+    #     plt.imshow(gt)
+    #     plt.title("Ground Truth", fontsize=22)
+    #     plt.show()
+    #
+    #     fig.savefig('depth_evaluation/{}'.format(i))
+
     # loop over the predicted depth images
     for i in range(pred_disps.shape[0]):
 
@@ -207,29 +404,52 @@ def evaluate(opt):
 
         pred_disp = pred_disps[i]
 
+        original_attention_mask = original_attention_masks[i]
+        casted_attention_mask = casted_attention_masks[i]
+
         # resize back to depth label because during training kitti images were downsized
         pred_disp = cv2.resize(pred_disp, (gt_width, gt_height))
-        pred_depth = 1 / pred_disp
+        original_attention_mask = cv2.resize(original_attention_mask, (gt_width, gt_height))
+        casted_attention_mask = cv2.resize(casted_attention_mask, (gt_width, gt_height))
 
+        pred_depth = 1 / pred_disp
 
 
         # EIGEN
         if opt.eval_split == "eigen":
+
+            #gt depth = 375, 1242
+
+            # gt depth > 0.001 and gt depth < 80. # so filter out the pixels where the label is failing.
             mask = np.logical_and(gt_depth > MIN_DEPTH, gt_depth < MAX_DEPTH)
 
             crop = np.array([0.40810811 * gt_height, 0.99189189 * gt_height,
                              0.03594771 * gt_width,  0.96405229 * gt_width]).astype(np.int32)
             crop_mask = np.zeros(mask.shape)
+
+            # select rows 153 t/m 371, colums = 44 t/m 1197 because the top rows are not captures by the label
             crop_mask[crop[0]:crop[1], crop[2]:crop[3]] = 1
+
+            # so if the label values are > 0 and < 80 and if it falls inside the row, col criterea
             mask = np.logical_and(mask, crop_mask)
+
 
         else:
             mask = gt_depth > 0
-        # breakpoint()
+
+
+        original_mask = mask.copy()
+
+        if opt.labels_inside_mask:
+
+            # keep only the label values inside the attention mask
+            mask = np.logical_and(mask, casted_attention_mask)
+
+        plot_overview(original_kitti[i], original_attention_mask, casted_attention_mask, pred_disps[i], gt_depth, mask,
+                      i, original_mask)
+
         pred_depth = pred_depth[mask]
         gt_depth = gt_depth[mask]
-
-        # breakpoint()
 
         pred_depth *= opt.pred_depth_scale_factor
 
@@ -242,7 +462,10 @@ def evaluate(opt):
         pred_depth[pred_depth < MIN_DEPTH] = MIN_DEPTH
         pred_depth[pred_depth > MAX_DEPTH] = MAX_DEPTH
 
-        errors.append(compute_errors(gt_depth, pred_depth))
+        # breakpoint()
+        if gt_depth.shape[0] > 0 and pred_depth.shape[0] > 0:
+            errors.append(compute_errors(gt_depth, pred_depth))
+
 
     if not opt.disable_median_scaling:
         ratios = np.array(ratios)
