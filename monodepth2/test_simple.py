@@ -23,6 +23,7 @@ from layers import disp_to_depth
 from utils import download_model_if_doesnt_exist
 
 
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Simple testing funtion for Monodepthv2 models.')
@@ -32,7 +33,11 @@ def parse_args():
     parser.add_argument('--model_name', type=str,
                         help='name of a pretrained model to use',
                         choices=[
-                            "weights_0",
+                            "weights_epoch6_batch_idx0",
+                            "weights_5_batch_idx9999",
+                            "weights_9_batch_idx9999",
+                            "weights_3",
+                            "weights_5",
                             "weights_19",
                             "mono_640x192",
                             "stereo_640x192",
@@ -63,8 +68,19 @@ def test_simple(args):
     else:
         device = torch.device("cpu")
 
-    download_model_if_doesnt_exist(args.model_name)
-    model_path = os.path.join("models", args.model_name)
+    # download_model_if_doesnt_exist(args.model_name)
+    model_path = os.path.join("../../experiment_weights/all/monodepth_models/experiment#29/", args.model_name)
+    # model_path = os.path.join("monodepth_models/mdp/models/", args.model_name)
+    # \monodepth_models\mdp\models\mono_640x192
+                              # D:\experiment_weights\BASELINE_monodepth2\weights\run_1\models\models)
+    # model_path = os.path.join("../../experiment_weights/BASELINE_monodepth2/weights/run_2/models/models/", args.model_name)
+
+    # model_path = os.path.join("models/", args.model_name)
+
+
+    # model_path = os.path.join("../../experiment_weights/BASELINE/epoch9/", args.model_name)
+    # D:\experiment_weights\BASELINE\epoch9
+
     print("-> Loading model from ", model_path)
     encoder_path = os.path.join(model_path, "encoder.pth")
     depth_decoder_path = os.path.join(model_path, "depth.pth")
