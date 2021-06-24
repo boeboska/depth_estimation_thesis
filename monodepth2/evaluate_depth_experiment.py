@@ -38,12 +38,20 @@ STEREO_SCALE_FACTOR = 5.4
 # plot_overview(current_kitti, original_attention_mask, casted_attention_mask, pred_disps[i], gt, )
 
 
+
+
 def plot_overview(original_kitti, original_attention_mask, casted_attention_mask, pred_disps, gt_depth, mask, i, original_mask):
     fig, axis = plt.subplots(3, 2, figsize=(18, 9.5))
+
+    path = f'hidde_depth_imgs/{i}'
+    if not os.path.exists(path):
+        os.mkdir(path)
 
     current_kitti = original_kitti
     current_kitti = np.swapaxes(current_kitti, 0, 1)
     current_kitti = np.swapaxes(current_kitti, 1, 2)
+
+    np.save(os.path.join(path, 'kitti.npy'), current_kitti)
 
     font_nr = 15
 
@@ -58,12 +66,16 @@ def plot_overview(original_kitti, original_attention_mask, casted_attention_mask
     axis[0, 1].set_title('Weight mask before pre processing', fontdict={'fontsize': font_nr})
     axis[0, 1].axis('off')
     sns.heatmap(original_attention_mask, ax=axis[0, 1], vmin=1, vmax=1.2, cmap='Greens', center=1, cbar=False)
+    np.save(os.path.join(path, 'original_attention_mask.npy'), original_attention_mask)
+
 
     # axis[2].set_title('Weight mask after pre processing', fontdict={'fontsize': 20, 'fontweight': 'bold'})
     axis[1,1].set_title('Weight mask after pre processing', fontdict={'fontsize': font_nr})
     # axis[2].title.set_text('Weight mask before pre processing')
     axis[1,1].axis('off')
     sns.heatmap(casted_attention_mask, ax=axis[1,1], vmin=0.8, vmax=1.2, cmap='Greens', center=1, cbar=False)
+    np.save(os.path.join(path, 'casted_attention_mask.npy'), casted_attention_mask)
+
 
     # axis[3].set_title('Depth prediction', fontdict={'fontsize': 20})
     # # axis[3].title.set_text('Depth prediction')
@@ -82,11 +94,14 @@ def plot_overview(original_kitti, original_attention_mask, casted_attention_mask
     # axis[4].title.set_text('LABEL')
     axis[1,0].axis('off')
     axis[1,0].imshow(gt, cmap='plasma')
+    np.save(os.path.join(path, 'ground_truth.npy'), gt)
+
 
     axis[2,0].set_title('Depth label', fontdict={'fontsize': font_nr})
     # axis[5].title.set_text('Values left over')
     axis[2,0].axis('off')
     sns.heatmap(torch.tensor(original_mask).to(torch.float32), ax=axis[2,0], vmin=0.8, vmax=1.2, cmap='Greens', center=1, cbar=False)
+    np.save(os.path.join(path, 'original_mask.npy'), original_mask)
 
     update_mask = torch.tensor(mask).to(torch.float32)
 
@@ -94,10 +109,11 @@ def plot_overview(original_kitti, original_attention_mask, casted_attention_mask
     # axis[6].title.set_text('Values left over with attention mask')
     axis[2,1].axis('off')
     sns.heatmap(update_mask, ax=axis[2,1], vmin=0.8, vmax=1.2, cmap='Greens', center=1, cbar=False)
+    np.save(os.path.join(path, 'update_mask.npy'), update_mask)
 
     fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=.4)
 
-    fig.savefig('depth_evaluation_thesis_plot/{}'.format(i))
+    fig.savefig(f'{path}/{i}')
     plt.close('all')
     # breakpoint()
 
@@ -153,6 +169,8 @@ def evaluate(opt):
     """Evaluates a pretrained model using a specified test set
     """
 
+    if not os.path.exists('hidde_depth_imgs'):
+        os.mkdir('hidde_depth_imgs')
 
     MIN_DEPTH = 1e-3
     MAX_DEPTH = 80
@@ -189,9 +207,9 @@ def evaluate(opt):
         encoder.load_state_dict({k: v for k, v in encoder_dict.items() if k in model_dict})
         depth_decoder.load_state_dict(torch.load(decoder_path))
 
-        encoder.cuda()
+        encoder#.cuda()
         encoder.eval()
-        depth_decoder.cuda()
+        depth_decoder#.cuda()
         depth_decoder.eval()
 
         pred_disps = []
@@ -207,7 +225,7 @@ def evaluate(opt):
             for i, data in enumerate(dataloader):
 
                 print(i / len(dataloader))
-                input_color = data[("color", 0, 0)].cuda()
+                input_color = data[("color", 0, 0)]#.cuda()
 
                 weight_masks = data['weight_matrix'].clone()
 
@@ -241,9 +259,9 @@ def evaluate(opt):
                 original_attention_masks.append(original_masks)
                 original_kitti.append(input_color.cpu())
 
-                # breakpoint()
-                if i ==1:
-                    break
+                # # breakpoint()
+                # if i ==1:
+                #     break
 
         # AMOUNT IMG, 192, 640
         original_attention_masks = np.concatenate(original_attention_masks)
@@ -445,8 +463,8 @@ def evaluate(opt):
             # keep only the label values inside the attention mask
             mask = np.logical_and(mask, casted_attention_mask)
 
-        plot_overview(original_kitti[i], original_attention_mask, casted_attention_mask, pred_disps[i], gt_depth, mask,
-                      i, original_mask)
+        # plot_overview(original_kitti[i], original_attention_mask, casted_attention_mask, pred_disps[i], gt_depth, mask,
+        #               i, original_mask)
 
         pred_depth = pred_depth[mask]
         gt_depth = gt_depth[mask]
