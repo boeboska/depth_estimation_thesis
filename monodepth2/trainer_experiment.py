@@ -347,7 +347,7 @@ class Trainer:
         for batch_idx, inputs in enumerate(self.train_loader):
 
 
-            print("IDX", batch_idx)
+            # print("IDX", batch_idx)
             # print(inputs.shape)
 
             before_op_time = time.time()
