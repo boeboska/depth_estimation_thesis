@@ -14,6 +14,9 @@ import torchvision.models as models
 import torch.utils.model_zoo as model_zoo
 
 
+from networks.asp_oc_block import ASP_OC_Module
+
+
 class ResNetMultiImageInput(models.ResNet):
     """Constructs a resnet model with varying number of input images.
     Adapted from https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
@@ -29,10 +32,11 @@ class ResNetMultiImageInput(models.ResNet):
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        print("layers", layers)
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride = 2)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride = 2)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -67,7 +71,7 @@ class ResnetEncoder(nn.Module):
     """
     def __init__(self, num_layers, pretrained, num_input_images=1, top_k=0):
         super(ResnetEncoder, self).__init__()
-
+        print("setting up basic resnet encoder")
         self.num_ch_enc = np.array([64, 64, 128, 256, 512])
 
         resnets = {18: models.resnet18,
@@ -83,6 +87,19 @@ class ResnetEncoder(nn.Module):
         self.num_input_images = num_input_images
         self.top_k = top_k
 
+        self.context = nn.Sequential(
+
+            # # go from 2048 channels to 512 channels
+            # nn.Conv2d(2048, 512, kernel_size=3, stride=1, padding=1),
+            # # ABN_module(512),
+            # nn.BatchNorm2d(512),
+            # nn.ReLU(inplace=False),
+
+            ASP_OC_Module(512, 256)
+        )
+
+        self.cls = nn.Conv2d(512, 512, kernel_size=1, stride=1, padding=0, bias=True)
+
         if num_layers not in resnets:
             raise ValueError("{} is not a valid number of resnet layers".format(num_layers))
 
@@ -96,7 +113,6 @@ class ResnetEncoder(nn.Module):
             self.num_ch_enc[1:] *= 4
 
     def forward(self, input_image, masks = None):
-        # breakpoint()
         self.features = []
         x = (input_image - 0.45) / 0.225
 
@@ -110,10 +126,17 @@ class ResnetEncoder(nn.Module):
 
         x = self.encoder.conv1(x)
         x = self.encoder.bn1(x)
-        self.features.append(self.encoder.relu(x))
-        self.features.append(self.encoder.layer1(self.encoder.maxpool(self.features[-1])))
-        self.features.append(self.encoder.layer2(self.features[-1]))
-        self.features.append(self.encoder.layer3(self.features[-1]))
-        self.features.append(self.encoder.layer4(self.features[-1]))
+        self.features.append(self.encoder.relu(x))   # 1, 64, 96, 320
+        self.features.append(self.encoder.layer1(self.encoder.maxpool(self.features[-1]))) # 1, 64, 48, 160
+        self.features.append(self.encoder.layer2(self.features[-1])) # 1, 128, 24, 80
+        self.features.append(self.encoder.layer3(self.features[-1])) # 1, 256, 12, 40
+        self.features.append(self.encoder.layer4(self.features[-1])) # 1, 512, 6, 20
+        # breakpoint()
+        # 1/0
+        # if self.self_attention:
+        #
+        #     self.features[-1] = self.context(self.features[-1])
+        #
+        #     self.features[-1] = self.cls(self.features[-1])
 
         return self.features

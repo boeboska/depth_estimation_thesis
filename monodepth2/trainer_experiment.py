@@ -48,6 +48,7 @@ torch.autograd.set_detect_anomaly(True)
 
 from attention_mask_loss import *
 from attention_weight_mask import *
+from self_attention_util import *
 from edge_code import edge_detection_bob_hidde
 # import edge_code as edge_code
 
@@ -91,13 +92,34 @@ class Trainer:
         if self.opt.use_stereo:
             self.opt.frame_ids.append("s")
 
-        self.models["encoder"] = networks.ResnetEncoder(
-            self.opt.num_layers, self.opt.weights_init == "pretrained", top_k = self.opt.top_k)
-        self.models["encoder"].to(self.device)
-        self.parameters_to_train += list(self.models["encoder"].parameters())
+        # print("ATTENTION", self.opt.self_attention)
+        # breakpoint()
+        # if you want to use self attention
+        if self.opt.self_attention == True:
+            self.models["encoder"] = networks.ResnetEncoderSelfAttention(
+                self.opt.num_layers, self.opt.weights_init == "pretrained", top_k=self.opt.top_k)
+            self.models["encoder"].to(self.device)
+            self.parameters_to_train += list(self.models["encoder"].parameters())
 
-        self.models["depth"] = networks.DepthDecoder(
-            self.models["encoder"].num_ch_enc, self.opt.scales)
+
+        else:
+            # print("JAAJAJAJ")
+            self.models["encoder"] = networks.ResnetEncoder(
+                self.opt.num_layers, self.opt.weights_init == "pretrained", top_k = self.opt.top_k)
+            self.models["encoder"].to(self.device)
+            self.parameters_to_train += list(self.models["encoder"].parameters())
+
+            print(sum(p.numel() for p in self.models["encoder"].parameters() if p.requires_grad))
+
+        # print("ENCODEERTJE HIDDE", self.models["encoder"])
+        # breakpoint()
+        if self.opt.self_attention:
+            self.models["depth"] = networks.DepthDecoderSelfAttention(
+                self.models["encoder"].num_ch_enc, self.opt.self_attention, self.opt.scales)
+        else:
+
+            self.models["depth"] = networks.DepthDecoder(
+                self.models["encoder"].num_ch_enc, self.opt.scales)
         self.models["depth"].to(self.device)
         self.parameters_to_train += list(self.models["depth"].parameters())
 
@@ -157,9 +179,9 @@ class Trainer:
 
         fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files.txt")
 
-        train_filenames = readlines(fpath.format("train"))
+        train_filenames = readlines(fpath.format("train_small"))
         val_filenames = readlines(fpath.format("val"))
-        # test_filesnames = readlines(fpath.format("test"))
+        test_filesnames = readlines(fpath.format("update_test"))
 
         img_ext = '.png' if self.opt.png else '.jpg'
 
@@ -202,29 +224,29 @@ class Trainer:
         self.val_iter = iter(self.val_loader)
 
 
-        # test_dataset = self.dataset(
-        #     self.opt.convolution_experiment,
-        #     self.opt.top_k,
-        #     self.opt.seed,
-        #     self.opt.weight_mask_method,
-        #     self.opt.weight_matrix_path,
-        #     self.opt.attention_mask_loss,
-        #     self.opt.edge_loss,
-        #     self.opt.data_path,
-        #     self.opt.attention_path,
-        #     self.opt.attention_threshold,
-        #     test_filesnames,
-        #     self.opt.height,
-        #     self.opt.width,
-        #     self.opt.frame_ids,
-        #     4,
-        #     is_train=False,
-        #     img_ext=img_ext)
-        # self.test_loader = DataLoader(
-        #     test_dataset, self.opt.batch_size, True,
-        #     num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
-        #
-        # self.test_iter = iter(self.test_loader)
+        test_dataset = self.dataset(
+            self.opt.convolution_experiment,
+            self.opt.top_k,
+            self.opt.seed,
+            self.opt.weight_mask_method,
+            self.opt.weight_matrix_path,
+            self.opt.attention_mask_loss,
+            self.opt.edge_loss,
+            self.opt.data_path,
+            self.opt.attention_path,
+            self.opt.attention_threshold,
+            test_filesnames,
+            self.opt.height,
+            self.opt.width,
+            self.opt.frame_ids,
+            4,
+            is_train=False,
+            img_ext=img_ext)
+        self.test_loader = DataLoader(
+            test_dataset, self.opt.batch_size, True,
+            num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
+
+        self.test_iter = iter(self.test_loader)
         #
 
 
@@ -324,7 +346,8 @@ class Trainer:
 
         for batch_idx, inputs in enumerate(self.train_loader):
 
-            # print(batch_idx)
+
+            print("IDX", batch_idx)
             # print(inputs.shape)
 
             before_op_time = time.time()
@@ -393,9 +416,26 @@ class Trainer:
             else:
                 # Otherwise, we only feed the image with frame_id 0 through the depth encoder
                 # breakpoint()
-                features = self.models["encoder"](inputs["color_aug", 0, 0])
-                # breakpoint()
-            outputs = self.models["depth"](features)
+                # print("OPTIONS SELF ATTENTION ", self.opt.self_attention)
+
+                # print("ENDCODER WEER ", self.models["encoder"])
+                if self.opt.self_attention:
+                    # print("ENCODER SELF ATTENTION GA IK DOEN")
+
+                    features, attention_maps, attention_maps_test = self.models["encoder"](inputs["color_aug", 0, 0])
+                else:
+
+                    features = self.models["encoder"](inputs["color_aug", 0, 0])
+
+            if self.opt.self_attention:
+                outputs = self.models["depth"](features, attention_maps, attention_maps_test)
+
+                if batch_idx % self.opt.save_plot_every == 0:
+                    save_self_attention_masks(inputs, outputs, batch_idx, self.epoch, self.opt.model_name, self.opt.log_dir)
+
+            else:
+
+                outputs = self.models["depth"](features)
 
         # FALSE
         if self.opt.predictive_mask:
@@ -475,7 +515,8 @@ class Trainer:
             'loss': None,
             'loss_within_attention_mask': None,
             'loss_within_attention_mask_dialation_1': None,
-            'loss_within_attention_mask_dialation_3': None
+            'loss_within_attention_mask_dialation_3': None,
+            'total_loss_without_edge': None
         }
 
         # if this amount of pixels is not yet seen
@@ -483,6 +524,7 @@ class Trainer:
 
             # fill dict with the numbers
             for key in empty_dict_losses:
+                # breakpoint()
                 empty_dict_losses[key] = [losses[key].item()]
 
             # add to the main dict
@@ -506,14 +548,22 @@ class Trainer:
     def test_all(self, current_model):
 
         loss_per_mask_size = {}
+        edge_loss_total = []
 
         self.set_eval()
         start = time.time()
         # loop over all the validation images
         for batch_idx, inputs in enumerate(self.test_loader):
-            print(batch_idx)
+
+
+            if batch_idx % 250 == 0:
+
+                print(batch_idx)
             with torch.no_grad():
                 outputs, losses = self.process_batch(inputs, batch_idx)
+
+                # breakpoint()
+                # edge_loss_total.append(['total_loss_without_edge'])
                 loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
 
 
@@ -526,8 +576,8 @@ class Trainer:
     def val_all(self, current_model):
         """Validate on the whole validation set"""
 
-        loss_per_mask_size = {}
-
+        # loss_per_mask_size = {}
+        validation_edge_loss = []
 
         # avg_dialation_size = {}
         # avg_dialation_size["additional_dialation_1"] = []
@@ -548,13 +598,22 @@ class Trainer:
 
                 outputs, losses = self.process_batch(inputs, batch_idx)
 
+                # add edge loss for current image
+                validation_edge_loss.append(losses['loss'])
                 # breakpoint()
-                loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
+
+
+
+                # loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
 
 
         # save the dictionary
-        with open('validation_all/' + current_model +  '.pkl', 'wb') as f:
-            pickle.dump(loss_per_mask_size, f, pickle.HIGHEST_PROTOCOL)
+        # with open('validation_all/' + current_model +  '.pkl', 'wb') as f:
+        #     pickle.dump(loss_per_mask_size, f, pickle.HIGHEST_PROTOCOL)
+
+        # save list
+        validation_edge_loss = np.array(validation_edge_loss)
+        np.save('validation_all/' + current_model, validation_edge_loss)
 
         return None
 
@@ -862,16 +921,16 @@ class Trainer:
             loss_without_mask += to_optimise.mean()
             loss_without_edge += to_optimise.mean()
 
-            # temp = to_optimise * loss_inside_mask_tensor
-            # loss_within_mask += torch.mean( temp [temp > 0] )
-            #
-            #
-            # temp = to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_1).to(self.device)
-            # loss_within_mask_dialation_1 += torch.mean( temp [temp > 0] )
-            #
-            #
-            # temp = to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_3).to(self.device)
-            # loss_within_mask_dialation_3 += torch.mean( temp [temp > 0] )
+            temp = to_optimise * loss_inside_mask_tensor
+            loss_within_mask += torch.mean( temp [temp > 0] )
+
+
+            temp = to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_1).to(self.device)
+            loss_within_mask_dialation_1 += torch.mean( temp [temp > 0] )
+
+
+            temp = to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_3).to(self.device)
+            loss_within_mask_dialation_3 += torch.mean( temp [temp > 0] )
 
 
             # if amount_pixels_inside_mask > 8000 and scale == 0 or amount_pixels_inside_mask < 2000 and scale == 0:

@@ -45,7 +45,7 @@ class MonodepthOptions:
         self.parser.add_argument("--save_plot_every",
                                  type=int,
                                  help="how often to save edge loss or additional weight loss images during training",
-                                 default=500)
+                                 default=250)
         self.parser.add_argument("--edge_detection_threshold",
                                  type=float,
                                  help="The threshold used for canny edge detection. The lower the number the easier it will find edges",
@@ -190,6 +190,17 @@ class MonodepthOptions:
                                  type=int,
                                  help="step size of the scheduler",
                                  default=15)
+
+        # self attention
+
+        self.parser.add_argument("--self_attention",
+                                 help="if set, uses self-attention",
+                                 type=bool,
+                                 default = False)
+        # self.parser.add_argument("--no_ddv",
+        #                          help="is set, disable discrete disparity volume",
+        #                          action="store_true",
+        #                          default = True)
 
         # ABLATION options
         self.parser.add_argument("--v1_multiscale",
