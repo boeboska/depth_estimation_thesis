@@ -12,6 +12,11 @@ from torch.utils.data import DataLoader
 
 # breakpoint()
 torch.cuda.is_available()
+
+torch.backends.cudnn.enabled = False
+torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.deterministic = True
+
 # from tensorboardX import SummaryWriter
 
 
