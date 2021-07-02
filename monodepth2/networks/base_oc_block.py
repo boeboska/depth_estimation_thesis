@@ -66,10 +66,10 @@ class _SelfAttentionBlock(nn.Module):
         # breakpoint()
 
         # scale = 2
-        # if self.scale > 1:
-        #
-        #     # 1, 256, 3, 10
-        #     x = self.pool(x)
+        if self.scale > 1:
+
+            # 1, 256, 3, 10
+            x = self.pool(x)
 
         # 1, 256, 30
         value = self.f_value(x).view(batch_size, self.value_channels, -1)
@@ -110,8 +110,8 @@ class _SelfAttentionBlock(nn.Module):
         # print( "SCLAE ", self.scale)
         # print("eerst", context.shape)
         # self.scale = 2
-        # if self.scale > 1:
-        #     context = F.upsample(input=context, size=(h, w), mode='bilinear', align_corners=True)
+        if self.scale > 1:
+            context = F.upsample(input=context, size=(h, w), mode='bilinear', align_corners=True)
         # print("NA UPSAMPLE", context.shape)
         return context
 
