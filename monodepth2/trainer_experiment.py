@@ -179,7 +179,8 @@ class Trainer:
 
         fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files.txt")
 
-        train_filenames = readlines(fpath.format("train_small"))
+        # train_filenames = readlines(fpath.format("train_small"))
+        train_filenames = readlines(fpath.format("train"))
         val_filenames = readlines(fpath.format("val"))
         test_filesnames = readlines(fpath.format("update_test"))
 
