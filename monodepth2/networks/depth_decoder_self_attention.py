@@ -71,23 +71,26 @@ class DepthDecoderSelfAttention(nn.Module):
         return F.interpolate(x, scale_factor=2, mode="nearest")
 
     def forward(self, input_features, attention_maps, attention_maps_test):
+
         self.outputs = {}
 
         x = input_features[-1]
 
+        # 4, 3, 2, 1, 0
         for i in range(4, -1, -1):
 
             x = self.convs[("upconv", i, 0)](x)
 
-            if i < 3:
+            if i < 2:
                 x = [upsample(x)]
+
             else:
                 x = [x]
 
             if self.use_skips and i > 0:
 
                 x += [input_features[i - 1]]
-
+            # print("2e", x[0].shape, x[1].shape)
             x = torch.cat(x, 1)
 
             x = self.convs[("upconv", i, 1)](x)

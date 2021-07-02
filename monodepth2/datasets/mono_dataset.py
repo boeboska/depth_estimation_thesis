@@ -120,7 +120,10 @@ class MonoDataset(data.Dataset):
 
         self.resize = {}
         for i in range(self.num_scales):
-            s = 2 ** i
+            if i == 3:
+                s = 2 ** 2
+            else:
+                s = 2 ** i
             self.resize[i] = transforms.Resize((self.height // s, self.width // s),
                                                interpolation=self.interp)
 

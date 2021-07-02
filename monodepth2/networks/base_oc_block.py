@@ -60,14 +60,16 @@ class _SelfAttentionBlock(nn.Module):
 
     def forward(self, x):
 
-        # 1, 6, 20
+        # 1, 6, 20 >>> 24 , 80
         batch_size, h, w = x.size(0), x.size(2), x.size(3)
 
-        # scale = 2
-        if self.scale > 1:
+        # breakpoint()
 
-            # 1, 256, 3, 10
-            x = self.pool(x)
+        # scale = 2
+        # if self.scale > 1:
+        #
+        #     # 1, 256, 3, 10
+        #     x = self.pool(x)
 
         # 1, 256, 30
         value = self.f_value(x).view(batch_size, self.value_channels, -1)
@@ -108,8 +110,8 @@ class _SelfAttentionBlock(nn.Module):
         # print( "SCLAE ", self.scale)
         # print("eerst", context.shape)
         # self.scale = 2
-        if self.scale > 1:
-            context = F.upsample(input=context, size=(h, w), mode='bilinear', align_corners=True)
+        # if self.scale > 1:
+        #     context = F.upsample(input=context, size=(h, w), mode='bilinear', align_corners=True)
         # print("NA UPSAMPLE", context.shape)
         return context
 
@@ -197,15 +199,17 @@ class BaseOC_Context_Module(nn.Module):
 
     def forward(self, feats):
 
-        # breakpoint()
         # print("FORWARD HIER")
         # feats = 1, 256, 6, 20
 
+        # there is only 1 stage
         priors = [stage(feats) for stage in self.stages]
 
         # breakpoint()
         context = priors[0]  # 1, 256, 24, 80
 
+
+        # thisone is not performed
         for i in range(1, len(priors)):
 
             context += priors[i]
