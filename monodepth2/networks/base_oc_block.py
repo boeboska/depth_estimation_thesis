@@ -76,11 +76,12 @@ class _SelfAttentionBlock(nn.Module):
         # 1, 30, 256
         value = value.permute(0, 2, 1)
 
-        # breakpoint()
-
         # f_query(x)  = 1, 128, 3, 10 >>>  .view() >> 1, 128, 30
+
+        # 1, 256, 12, 40
         query = self.f_query(x).view(batch_size, self.key_channels, -1)
         # 1, 30, 128
+
         query = query.permute(0, 2, 1)
 
         # breakpoint()
@@ -106,9 +107,6 @@ class _SelfAttentionBlock(nn.Module):
         # breakpoint()
         context = self.W(context)
 
-        # breakpoint()
-        # print( "SCLAE ", self.scale)
-        # print("eerst", context.shape)
         # self.scale = 2
         if self.scale > 1:
             context = F.upsample(input=context, size=(h, w), mode='bilinear', align_corners=True)

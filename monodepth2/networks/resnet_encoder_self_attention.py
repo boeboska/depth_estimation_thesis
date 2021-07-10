@@ -40,7 +40,7 @@ class ResNetMultiImageInputSelfAttention(models.ResNet):
 
 
         self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1])
+        self.layer2 = self._make_layer(block, 128, layers[1], stride = 2)
         self.layer3 = self._make_layer(block, 256, layers[2]) # removed stride
         self.layer4 = self._make_layer(block, 512, layers[3]) # removed stride
 
@@ -102,9 +102,9 @@ class ResnetEncoderSelfAttention(nn.Module):
             ASP_OC_Module(512, 256)
         )
 
-        self.prepare_self_attention = nn.Sequential(
-            PREPARE_SELF_ATTENTION_MODULE(64)
-        )
+        # self.prepare_self_attention = nn.Sequential(
+        #     PREPARE_SELF_ATTENTION_MODULE(64)
+        # )
 
         # num classes 128 ?? komt uit de andere resnet
         self.cls = nn.Conv2d(512, 2048, kernel_size=1, stride=1, padding=0, bias=True)
@@ -174,23 +174,24 @@ class ResnetEncoderSelfAttention(nn.Module):
         x = (input_image - 0.45) / 0.225
 
         # print("num input img", self.num_input_images) print("top k  en masks", self.top_k, masks.shape)
-        if self.top_k > 0 and self.num_input_images != 2 and masks is not None:
-            x = torch.cat((x, masks), dim = 1)
+        # if self.top_k > 0 and self.num_input_images != 2 and masks is not None:
+        #     x = torch.cat((x, masks), dim = 1)
 
         x = self.encoder.conv1(x)
         x = self.encoder.bn1(x)
 
         self.features.append(self.encoder.relu(x))   # 1, 64, 96, 320
         self.features.append(self.encoder.layer1(self.encoder.maxpool(self.features[-1]))) # 1, 64, 48, 160
-        self.features.append(self.encoder.layer2(self.features[-1])) # 1, 128, 24, 80 >> 48, 160
+        self.features.append(self.encoder.layer2(self.features[-1])) # 1, 128, 24, 80 >> 24, 80
         self.features.append(self.encoder.layer3(self.features[-1])) # 1, 256, 12, 40 >> 24, 80
         self.features.append(self.encoder.layer4(self.features[-1])) # 1, 512, 6, 20 >> 24, 80
 
-
+        # breakpoint()
         # pre_self_attention_features = self.prepare_self_attention(self.features[1]) # 1, 512, 48, 160
 
-        self.features[-1], attention_maps_test = self.context(self.features[-1])  # attention maps > 1, 256, 48, 160
+        self.features[-1] = self.context(self.features[-1])  # attention maps > 1, 256, 48, 160
 
+        # breakpoint()
         attention_maps = self.features[-1] # 1, 512, 24, 80
 
 
@@ -229,7 +230,7 @@ class ResnetEncoderSelfAttention(nn.Module):
         #
         # breakpoint()
 
-        return self.features, attention_maps, attention_maps_test
+        return self.features, attention_maps
 
 
         # return self.features

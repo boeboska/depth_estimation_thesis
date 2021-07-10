@@ -17,10 +17,9 @@ from options import MonodepthOptions
 def experiment_training():
 
 
-    experiment_names = ["experiment#29"]
-    edge_weights = [2e-3]
+    experiment_names = ["experiment#33", "experiment#34"]
 
-    for current_model_name, edge_weight in zip(experiment_names, edge_weights):
+    for current_model_name in experiment_names:
 
         if os.path.exists('output_during_training.txt'):
             os.remove('output_during_training.txt')
@@ -31,13 +30,19 @@ def experiment_training():
         options = MonodepthOptions()
         opts = options.parse()
 
-        opts.attention_mask_loss = True
-        opts.model_name = current_model_name
-        opts.edge_weight = edge_weight
+        if current_model_name == "experiment#33":
+            opts.attention_mask_loss = True
+        else:
+            opts.attention_mask_loss = False
 
+        opts.model_name = current_model_name
+        opts.self_attention = True
+
+        opts.seed = 0
         opts.batch_size = 4
-        opts.num_workers = 4
-        opts.num_epochs = 10
+        opts.num_workers =4
+        opts.num_epochs = 6
+
 
         trainer = Trainer(opts)
         try:
@@ -46,11 +51,11 @@ def experiment_training():
             traceback.print_exc(file=file)
 
 if __name__ == "__main__":
-    # experiment_training()
-    options = MonodepthOptions()
-    opts = options.parse()
-    trainer = Trainer(opts)
+    experiment_training()
+    # options = MonodepthOptions()
+    # opts = options.parse()
+    # trainer = Trainer(opts)
     # try:
     # trainer.val_all()
-    trainer.train()
+    # trainer.train()
     # # except:

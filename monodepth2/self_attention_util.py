@@ -24,7 +24,7 @@ def save_self_attention_masks(inputs, outputs, batch_idx, epoch_nr, model_name, 
     # batch, 512, 6, 20
     self_attention_maps = outputs['self_attention_maps'][0]
 
-    self_attention_maps_test = outputs['self_attention_maps_test'][0]
+    # self_attention_maps_test = outputs['self_attention_maps_test'][0]
 
     original_img = inputs["color_aug", 0, 0]
 
@@ -33,11 +33,10 @@ def save_self_attention_masks(inputs, outputs, batch_idx, epoch_nr, model_name, 
     for i in range(10):
         # select one attention map randomly and save it
         rand_nr = randrange(self_attention_maps.shape[0])
-        rand_nr_test = randrange(self_attention_maps_test.shape[0])
 
         curr  = self_attention_maps[rand_nr]
 
-        fig, axis = plt.subplots(5, 1, figsize=(10, 15))
+        fig, axis = plt.subplots(3, 1, figsize=(10 , 15))
 
 
         # axis[0, 0].title.set_text('Kitti image')
@@ -53,18 +52,8 @@ def save_self_attention_masks(inputs, outputs, batch_idx, epoch_nr, model_name, 
         sns.heatmap(self_attention_maps[rand_nr].cpu().detach().numpy(), ax=axis[2], vmin=0, vmax=3, cmap="YlOrBr")
         axis[2].axis('off')
 
-        axis[3].set_title('Attention map test', fontdict={'fontsize': 20, 'fontweight': 'bold'})
-        sns.heatmap(self_attention_maps_test[rand_nr_test].cpu().detach().numpy(), ax=axis[3], vmin=0, vmax=1, cmap="YlOrBr")
-        axis[3].axis('off')
-
-        axis[4].set_title('Attention map test', fontdict={'fontsize': 20, 'fontweight': 'bold'})
-        sns.heatmap(self_attention_maps_test[rand_nr_test].cpu().detach().numpy(), ax=axis[4], vmin=0, vmax=3, cmap="YlOrBr")
-        axis[4].axis('off')
-
-
-
         fig.savefig(f'{path}/rand_nr{rand_nr}.png')
         plt.close(fig)
 
 
-    # breakpoint()
+    return None

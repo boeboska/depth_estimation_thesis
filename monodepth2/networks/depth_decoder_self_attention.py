@@ -36,7 +36,9 @@ class DepthDecoderSelfAttention(nn.Module):
         # self.num_ch_dec= np.array([64, 64, 128, 256, 2048])
         # self.num_ch_enc = np.array([64, 64, 128, 256, 2048]) # dit zijn de shapes die de encoder heeft
 
-        self.num_ch_dec = np.array([64, 32, 64, 128, 256])
+        self.num_ch_dec = np.array([16, 32, 64, 128, 256])
+
+
 
 
         self.convs = OrderedDict()
@@ -70,7 +72,7 @@ class DepthDecoderSelfAttention(nn.Module):
         """
         return F.interpolate(x, scale_factor=2, mode="nearest")
 
-    def forward(self, input_features, attention_maps, attention_maps_test):
+    def forward(self, input_features, attention_maps):
 
         self.outputs = {}
 
@@ -81,7 +83,7 @@ class DepthDecoderSelfAttention(nn.Module):
 
             x = self.convs[("upconv", i, 0)](x)
 
-            if i < 2:
+            if i < 3:
                 x = [upsample(x)]
 
             else:
@@ -90,7 +92,7 @@ class DepthDecoderSelfAttention(nn.Module):
             if self.use_skips and i > 0:
 
                 x += [input_features[i - 1]]
-            # print("2e", x[0].shape, x[1].shape)
+
             x = torch.cat(x, 1)
 
             x = self.convs[("upconv", i, 1)](x)
@@ -99,7 +101,7 @@ class DepthDecoderSelfAttention(nn.Module):
                 self.outputs[("disp", i)] = self.sigmoid(self.convs[("dispconv", i)](x))
 
         self.outputs['self_attention_maps'] = attention_maps
-        self.outputs['self_attention_maps_test'] = attention_maps_test
+        # self.outputs['self_attention_maps_test'] = attention_maps_test
 
         # dict_keys([
         # ('disp', 3) : 1, 1, 24, 80

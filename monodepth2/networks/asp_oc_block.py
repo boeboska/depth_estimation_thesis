@@ -124,4 +124,4 @@ class ASP_OC_Module(nn.Module):
         output = self.conv_bn_dropout(out)  # 1, 512, 24, 80 ... thisone 1, 512, 6, 20
 
 
-        return output, feat1
+        return output

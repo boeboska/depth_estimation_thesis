@@ -87,18 +87,18 @@ class ResnetEncoder(nn.Module):
         self.num_input_images = num_input_images
         self.top_k = top_k
 
-        self.context = nn.Sequential(
+        # self.context = nn.Sequential(
+        #
+        #     # # go from 2048 channels to 512 channels
+        #     # nn.Conv2d(2048, 512, kernel_size=3, stride=1, padding=1),
+        #     # # ABN_module(512),
+        #     # nn.BatchNorm2d(512),
+        #     # nn.ReLU(inplace=False),
+        #
+        #     ASP_OC_Module(512, 256)
+        # )
 
-            # # go from 2048 channels to 512 channels
-            # nn.Conv2d(2048, 512, kernel_size=3, stride=1, padding=1),
-            # # ABN_module(512),
-            # nn.BatchNorm2d(512),
-            # nn.ReLU(inplace=False),
-
-            ASP_OC_Module(512, 256)
-        )
-
-        self.cls = nn.Conv2d(512, 512, kernel_size=1, stride=1, padding=0, bias=True)
+        # self.cls = nn.Conv2d(512, 512, kernel_size=1, stride=1, padding=0, bias=True)
 
         if num_layers not in resnets:
             raise ValueError("{} is not a valid number of resnet layers".format(num_layers))

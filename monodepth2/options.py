@@ -45,7 +45,7 @@ class MonodepthOptions:
         self.parser.add_argument("--save_plot_every",
                                  type=int,
                                  help="how often to save edge loss or additional weight loss images during training",
-                                 default=250)
+                                 default=500)
         self.parser.add_argument("--edge_detection_threshold",
                                  type=float,
                                  help="The threshold used for canny edge detection. The lower the number the easier it will find edges",
@@ -72,8 +72,6 @@ class MonodepthOptions:
                                  default = 0.00000001)
 
 
-
-
         self.parser.add_argument("--weight_mask_method",
                                  type=str,
                                  help="The type of weight mask it will load in",
@@ -87,13 +85,13 @@ class MonodepthOptions:
         self.parser.add_argument("--reduce_attention_weight",
                                  type=float,
                                  help="map attention weight numbers to this number based on filter rule",
-                                 default=0.8)
+                                 default=0.9)
 
 
         self.parser.add_argument("--edge_weight",
                                  type=float,
                                  help="Weight multiplied with the edge loss",
-                                 default=2e-2)
+                                 default=2e-4)
         self.parser.add_argument("--attention_sum",
                                  type = int,
                                  help = "threshold of how big the attention mask may be during training",

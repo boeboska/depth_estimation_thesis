@@ -423,13 +423,13 @@ class Trainer:
                 if self.opt.self_attention:
                     # print("ENCODER SELF ATTENTION GA IK DOEN")
 
-                    features, attention_maps, attention_maps_test = self.models["encoder"](inputs["color_aug", 0, 0])
+                    features, attention_maps = self.models["encoder"](inputs["color_aug", 0, 0])
                 else:
 
                     features = self.models["encoder"](inputs["color_aug", 0, 0])
 
             if self.opt.self_attention:
-                outputs = self.models["depth"](features, attention_maps, attention_maps_test)
+                outputs = self.models["depth"](features, attention_maps)
 
                 if batch_idx % self.opt.save_plot_every == 0:
                     save_self_attention_masks(inputs, outputs, batch_idx, self.epoch, self.opt.model_name, self.opt.log_dir)
@@ -577,8 +577,8 @@ class Trainer:
     def val_all(self, current_model):
         """Validate on the whole validation set"""
 
-        # loss_per_mask_size = {}
-        validation_edge_loss = []
+        loss_per_mask_size = {}
+        # validation_edge_loss = []
 
         # avg_dialation_size = {}
         # avg_dialation_size["additional_dialation_1"] = []
@@ -600,21 +600,21 @@ class Trainer:
                 outputs, losses = self.process_batch(inputs, batch_idx)
 
                 # add edge loss for current image
-                validation_edge_loss.append(losses['loss'])
+                # validation_edge_loss.append(losses['loss'])
                 # breakpoint()
 
 
 
-                # loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
+                loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
 
-
+            # if batch_idx == 10:
         # save the dictionary
-        # with open('validation_all/' + current_model +  '.pkl', 'wb') as f:
-        #     pickle.dump(loss_per_mask_size, f, pickle.HIGHEST_PROTOCOL)
+        with open('validation_all/' + current_model + 'dial_around_edge' + '.pkl', 'wb') as f:
+            pickle.dump(loss_per_mask_size, f, pickle.HIGHEST_PROTOCOL)
 
         # save list
-        validation_edge_loss = np.array(validation_edge_loss)
-        np.save('validation_all/' + current_model, validation_edge_loss)
+        # validation_edge_loss = np.array(validation_edge_loss)
+        # np.save('validation_all/' + current_model, validation_edge_loss)
 
         return None
 
@@ -754,13 +754,18 @@ class Trainer:
         amount_pixels_inside_mask = attention_masks_for_calculating_loss_inside_mask.sum().item()
 
         attention_masks_for_calculating_loss_inside_mask_with_dilation_1 = attention_masks_for_calculating_loss_inside_mask.clone()
+        original_mask_before_dialation = attention_masks_for_calculating_loss_inside_mask.clone()
         attention_masks_for_calculating_loss_inside_mask_with_dilation_3 = attention_masks_for_calculating_loss_inside_mask.clone()
 
-        kernel = np.ones((2, 2), np.uint8)
+        kernel = np.ones((3, 3), np.uint8)
 
         for b in range(attention_masks_for_calculating_loss_inside_mask_with_dilation_1.shape[0]):
             attention_masks_for_calculating_loss_inside_mask_with_dilation_1[b] = torch.tensor(cv2.dilate(attention_masks_for_calculating_loss_inside_mask_with_dilation_1[b].cpu().detach().numpy(), kernel, iterations=1))
+            attention_masks_for_calculating_loss_inside_mask_with_dilation_1[b] = attention_masks_for_calculating_loss_inside_mask_with_dilation_1[b] - original_mask_before_dialation[b]
+
             attention_masks_for_calculating_loss_inside_mask_with_dilation_3[b] = torch.tensor(cv2.dilate(attention_masks_for_calculating_loss_inside_mask_with_dilation_3[b].cpu().detach().numpy(), kernel, iterations=3))
+            attention_masks_for_calculating_loss_inside_mask_with_dilation_3[b] = attention_masks_for_calculating_loss_inside_mask_with_dilation_3[b] - original_mask_before_dialation[b]
+
 
         # alle pixel waarden tot aan 1.03 map maar 1
         attention_mask_weight[
@@ -779,10 +784,10 @@ class Trainer:
         """
 
         # because once in the 250 steps you want to plot an edge loss
-        if batch_idx % self.opt.save_plot_every == 0 and self.opt.edge_loss:
-            original_masks = torch.clone(inputs['attention'])
-        else:
-            original_masks = None
+        # if batch_idx % self.opt.save_plot_every == 0 and self.opt.edge_loss:
+        #     original_masks = torch.clone(inputs['attention'])
+        # else:
+        #     original_masks = None
 
         # plot during training the original kitti image with the attention mask weight
 
@@ -935,17 +940,19 @@ class Trainer:
             temp = to_optimise * torch.tensor(loss_inside_mask_tensor_dialation_3).to(self.device)
             loss_within_mask_dialation_3 += torch.mean( temp [temp > 0] )
 
-
-            # if amount_pixels_inside_mask > 8000 and scale == 0 or amount_pixels_inside_mask < 2000 and scale == 0:
-            #
+            # if amount_pixels_inside_mask > 12000 and scale == 0 or amount_pixels_inside_mask < 750 and scale == 0:
+            # #
             #     # print(amount_pixels_inside_mask)
             #
             #     path = self.opt.log_dir + self.opt.model_name + "/" + "big_img_visualization/"
             #     if not os.path.exists(path):
             #         os.makedirs(path)
             #
-            #
-            #     fig, axis = plt.subplots(4, 1, figsize=(30, 20))
+            #     path = f'{path}/{batch_idx}'
+            #     if not os.path.exists(path):
+            #         os.makedirs(path)
+            # #
+            #     fig, axis = plt.subplots(2, 1, figsize=(30, 20))
             #
             #     original_img = inputs["color_aug", 0, 0]
             #
@@ -955,36 +962,17 @@ class Trainer:
             #     axis[0].set_title('Kitti image', fontdict={'fontsize': 20, 'fontweight': 'bold'})
             #     axis[0].axis('off')
             #     axis[0].imshow(original_img)
+            #     np.save(os.path.join(path, 'monodepth_loss.npy'), original_img)
             #
-            #     axis[1].set_title(f'Monodepth loss: {round(to_optimise.mean().item(), 2)}', fontdict={'fontsize': 20, 'fontweight': 'bold'})
+            #     axis[1].set_title(f'Attention mask: {amount_pixels_inside_mask}', fontdict={'fontsize': 20, 'fontweight': 'bold'})
             #     axis[1].axis('off')
-            #     sns.heatmap(to_optimise[0].cpu().squeeze(0).detach(), ax=axis[1], vmin=0, vmax=0.6, cmap='Greens',
+            #     sns.heatmap(attention_mask_weight.cpu().squeeze(0).detach(), ax=axis[1], vmin=1, vmax=1.2, cmap='Greens',
             #                 center=1)
-            #
-            #     # breakpoint()
-            #     axis[2].set_title(f'Attention mask: {amount_pixels_inside_mask}', fontdict={'fontsize': 20, 'fontweight': 'bold'})
-            #     axis[2].axis('off')
-            #     sns.heatmap(attention_mask_weight.cpu().squeeze(0).detach(), ax=axis[2], vmin=1, vmax=1.2, cmap='Greens',
-            #                 center=1)
-            #
-            #     # breakpoint()
-            #     temp = to_optimise * loss_inside_mask_tensor
-            #
-            #
-            #     axis[3].set_title(f'Monodepth loss inside mask: {round(torch.mean(temp[temp > 0]).item(), 3)}', fontdict={'fontsize': 20, 'fontweight': 'bold'})
-            #     axis[3].axis('off')
-            #     sns.heatmap(temp.cpu().squeeze(0).detach(), ax=axis[3], vmin=0, vmax=0.6, cmap='Greens',
-            #                 center=1)
-            #
-            #     plt.show()
-            #
+            #     np.save(os.path.join(path, 'attention_mask.npy'), loss_inside_mask_tensor[0].detach().cpu().numpy())
+            # #
             #     fig.savefig(f'{path}/batch_idx_{batch_idx, scale, amount_pixels_inside_mask}.png')
             #     plt.close(fig)
             #
-            #
-            #
-
-
 
 
 
