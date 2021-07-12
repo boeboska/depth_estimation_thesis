@@ -455,6 +455,8 @@ class Trainer:
         """Predict poses between input frames for monocular sequences.
         """
         outputs = {}
+
+        #TRUE
         if self.num_pose_frames == 2:
             # In this setting, we compute the pose to each source frame via a
             # separate forward pass through the pose network.
@@ -462,6 +464,8 @@ class Trainer:
             # select what features the pose network takes as input
             if self.opt.pose_model_type == "shared":
                 pose_feats = {f_i: features[f_i] for f_i in self.opt.frame_ids}
+
+             # True
             else:
                 pose_feats = {f_i: inputs["color_aug", f_i, 0] for f_i in self.opt.frame_ids}
 
@@ -473,6 +477,7 @@ class Trainer:
                     else:
                         pose_inputs = [pose_feats[0], pose_feats[f_i]]
 
+                    # breakpoint()
                     if self.opt.pose_model_type == "separate_resnet":
                         pose_inputs = [self.models["pose_encoder"](torch.cat(pose_inputs, 1))]
                     elif self.opt.pose_model_type == "posecnn":
@@ -481,6 +486,8 @@ class Trainer:
                     axisangle, translation = self.models["pose"](pose_inputs)
                     outputs[("axisangle", 0, f_i)] = axisangle
                     outputs[("translation", 0, f_i)] = translation
+
+                    # breakpoint()
 
                     # Invert the matrix if the frame id is negative
                     outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(

@@ -10,10 +10,15 @@ import torch.nn.functional as F
 def edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, device, height, width, log_dir, model_name, edge_detection_threshold, save_plot_every, batch_size):
 
     edges_overall = torch.zeros(batch_size, height, width).clone()
+    edges_overall_test = torch.zeros(batch_size, height, width).clone()
 
-    path = log_dir + model_name + "/" + "edge_loss_img/"
+    path = log_dir + model_name + "/" + "edge_loss_img"
     if not os.path.exists(path):
         os.makedirs(path)
+
+    path = f'{path}/{batch_idx}'
+    if not os.path.exists(path):
+        os.mkdir(path)
 
     attention_masks = inputs['attention'].to(device)
 
@@ -27,75 +32,141 @@ def edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, device, height, 
 
     for b in range(batch_size):
 
+        # path = f'{path}/{b}'
+        # if not os.path.exists(path):
+        #     os.mkdir(path)
         # cast to int for correct canny input
         depth_mask = np.uint8(disp[b].squeeze().cpu().detach().numpy() * 255)
 
         # dit zijn alle edges gevonden over het gehele diepte plaatje
         edges_disp = torch.from_numpy(cv2.Canny(depth_mask, edge_detection_threshold * 255, edge_detection_threshold * 255,
-                               apertureSize=3, L2gradient=False))
+                               apertureSize=3, L2gradient=False)) # 0.1
 
-        edges_disp_0_05 = torch.from_numpy(cv2.Canny(depth_mask, 0.05 * 255, 0.05 * 255,
-                               apertureSize=3, L2gradient=False))
-
-        edges_disp_0_20 = torch.from_numpy(cv2.Canny(depth_mask, 0.2 * 255, 0.2 * 255,
-                               apertureSize=3, L2gradient=False))
+        # edges_disp_0_05 = torch.from_numpy(cv2.Canny(depth_mask, 0.05 * 255, 0.05 * 255,
+        #                        apertureSize=3, L2gradient=False))
+        #
+        # edges_disp_0_20 = torch.from_numpy(cv2.Canny(depth_mask, 0.2 * 255, 0.2 * 255,
+        #                        apertureSize=3, L2gradient=False))
 
         # if batch_idx % save_plot_every == 0 and b == 0:
         original_img = inputs["color_aug", 0, 0][b]
 
         original_img = np.array(original_img.squeeze().cpu().detach().permute(1, 2, 0).numpy())
 
-
-        path_edge_threshold = "edge_img_for_thesis/edge_threshold/"
-        if not os.path.exists(path_edge_threshold):
-            print("PATH NOT EXSIST")
-            os.makedirs(path_edge_threshold)
-
-        print(path_edge_threshold)
-
-        fig, axis = plt.subplots(5, 1, figsize=(12, 12))
-
-        font_nr = 20
-
-        axis[0].imshow(original_img)
-        axis[0].set_title('Kitti image', fontsize=font_nr)
-        # axis[0].title.set_text('Original image')
-        axis[0].axis('off')
-
-        axis[1].imshow(disp[b].squeeze(0).squeeze(0).cpu().detach().numpy())
-        axis[1].set_title('Depth image', fontsize=font_nr)
-        # axis[1].title.set_text('depth image')
-        axis[1].axis('off')
-
-        axis[2].imshow(edges_disp_0_05 / 255)
-        axis[2].set_title('Edge detection threshold 0.05', fontsize=font_nr)
-        # axis[2].title.set_text('edges threshold 0.05')
-        axis[2].axis('off')
-
-        axis[3].set_title('Edge detection threshold 0.1', fontsize=font_nr)
-        axis[3].imshow(edges_disp / 255)
-        # axis[3].title.set_text('edges threshold 0.1')
-        axis[3].axis('off')
-
-        axis[4].imshow(edges_disp_0_20 / 255)
-        axis[4].set_title('Edge detection threshold 0.2', fontsize=font_nr)
-        # axis[4].title.set_text('edges threshold 0.2')
-        axis[4].axis('off')
-
-        fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=.4)
-
-        fig.savefig(
-            '{}/batchIDX_{}_threshold_{}_scale{}.png'.format(path_edge_threshold, batch_idx,
-                                                                  edge_detection_threshold, scale))
-        plt.close('all')
+          # EDGE THRESHOLD
+        # path = log_dir + model_name + "/" + "edge_loss_with_masks"
+        # # path = "edge_img_for_thesis/edge_threshold-hidde"
+        # if not os.path.exists(path):
+        #     print("PATH NOT EXSIST")
+        #     os.makedirs(path)
+        # path = f'{path}/{batch_idx}'
+        # if not os.path.exists(path):
+        #     os.mkdir(path)
 
 
+        # print(path_edge_threshold)
+
+        # fig, axis = plt.subplots(5, 1, figsize=(12, 12))
+        #
+        # font_nr = 20
+        # # EDGE THRESHOLDS PLAATJE
+        #
+        # axis[0].imshow(original_img)
+        # axis[0].set_title('Kitti image', fontsize=font_nr)
+        # # axis[0].title.set_text('Original image')
+        # axis[0].axis('off')
+        # np.save(os.path.join(path, 'original_img.npy'), original_img)
+        # #
+        # #
+        # axis[1].imshow(disp[b].squeeze(0).squeeze(0).cpu().detach().numpy())
+        # axis[1].set_title('Depth image', fontsize=font_nr)
+        # # axis[1].title.set_text('depth image')
+        # axis[1].axis('off')
+        # np.save(os.path.join(path, 'disp.npy'), disp[b].squeeze(0).squeeze(0).cpu().detach().numpy())
+        # #
+        # #
+        # axis[2].imshow(edges_disp_0_05 / 255)
+        # axis[2].set_title('Edge detection threshold 0.05', fontsize=font_nr)
+        # # axis[2].title.set_text('edges threshold 0.05')
+        # axis[2].axis('off')
+        # np.save(os.path.join(path, 'edges_disp_0_05.npy'), edges_disp_0_05)
+        # #
+        # #
+        # axis[3].set_title('Edge detection threshold 0.1', fontsize=font_nr)
+        # axis[3].imshow(edges_disp / 255)
+        # # axis[3].title.set_text('edges threshold 0.1')
+        # axis[3].axis('off')
+        # np.save(os.path.join(path, 'edges_disp_0.10.npy'), edges_disp)
+        # #
+        # #
+        # axis[4].imshow(edges_disp_0_20 / 255)
+        # axis[4].set_title('Edge detection threshold 0.2', fontsize=font_nr)
+        # # axis[4].title.set_text('edges threshold 0.2')
+        # axis[4].axis('off')
+        # np.save(os.path.join(path, 'edges_disp_0_20.npy'), edges_disp_0_20)
+        # #
+        # # fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=.4)
+        # #
+        # fig.savefig(
+        #     '{}/batchIDX_{}_threshold_{}_scale{}.png'.format(path, batch_idx,
+        #                                                           edge_detection_threshold, scale))
+        # plt.close('all')
 
 
 
+        # # EDGE PLAATJE BEGIN VAN TRAINING
+        # original_img = inputs["color_aug", 0, 0][b]
+        # #
+        # original_img = np.array(original_img.squeeze().cpu().detach().permute(1, 2, 0).numpy())
+        # #
+        #
+        # path_edge_start_training = f"edge_img_for_thesis/edge_start_training-hidde/{batch_idx}"
+        # if not os.path.exists(path_edge_start_training):
+        #     print("PATH NOT EXSIST")
+        #     os.makedirs(path_edge_start_training)
+        # path = path_edge_start_training
+        # #
+        # # print(path_edge_threshold)
+        # if batch_idx % 100 == 0:
+        #     fig, axis = plt.subplots(3, 1, figsize=(12, 12))
+        #     #
+        #     font_nr = 20
+        #     #
+        #     axis[0].imshow(original_img)
+        #     axis[0].set_title('Kitti image', fontsize=font_nr)
+        #     # axis[0].title.set_text('Original image')
+        #     axis[0].axis('off')
+        #     np.save(os.path.join(path, 'original_img.npy'), original_img)
+        #
+        #     #
+        #     axis[1].imshow(disp[b].squeeze(0).squeeze(0).cpu().detach().numpy())
+        #     axis[1].set_title('Depth image', fontsize=font_nr)
+        #     # axis[1].title.set_text('depth image')
+        #     axis[1].axis('off')
+        #     np.save(os.path.join(path, 'disp.npy'), disp[b].squeeze(0).squeeze(0).cpu().detach().numpy())
+        #
+        #
+        #
+        #     axis[2].set_title('Edges', fontsize=font_nr)
+        #     axis[2].imshow(edges_disp / 255)
+        #     # axis[3].title.set_text('edges threshold 0.1')
+        #     axis[2].axis('off')
+        #     np.save(os.path.join(path, 'edges_disp.npy'), edges_disp)
+        #
+        #
+        #
+        #     fig.savefig(
+        #         '{}/batchIDX_{}_threshold_{}_scale{}.png'.format(path_edge_start_training, batch_idx,
+        #                                                               edge_detection_threshold, scale))
+        #     plt.close('all')
+        #
+        #
+        #
+        #
+        #
+        #
 
-
-
+        # loop over the attention masks per kitti image
         for i, attention_mask in enumerate(attention_masks[b].squeeze(dim=0)):
 
             # the last x attention masks are zeros so skip them
@@ -110,52 +181,78 @@ def edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, device, height, 
             edges_per_attention_mask = torch.tensor(attention_mask_light).to(torch.float32) * edges_disp.to(torch.float32).cpu()
 
 
-
-
             # if sum == 0 then the found edges from attention mask are not yet in the overall edges
+            # sum == zero zodat je checkt dat deze edges not niet eerder zijn gebruikt
             if (edges_per_attention_mask * edges_overall[b]).sum().item() == 0 and (edges_per_attention_mask > 0).any():
 
                 edges_overall[b] += (edges_per_attention_mask / 255)
 
-                if batch_idx % save_plot_every == 0 and b == 0:
+    if batch_idx % save_plot_every == 0:
 
-                    original_img = inputs["color_aug", 0, 0][b]
+        b = 0
 
-                    original_img = np.array(original_img.squeeze().cpu().detach().permute(1, 2, 0).numpy())
+        fig, axis = plt.subplots(3, 1, figsize=(12, 12))
 
-                    fig, axis = plt.subplots(7, 1, figsize=(12, 12))
-                    axis[0].imshow(attention_mask)
-                    axis[0].title.set_text(f'attention mask sum {attention_mask.sum()}')
+        original_img = inputs["color_aug", 0, 0][b]
+        original_img = np.array(original_img.squeeze().cpu().detach().permute(1, 2, 0).numpy())
+        # np.save(os.path.join(path, 'original_img.npy'), original_img)
 
+        axis[0].imshow(original_img)
+        axis[0].title.set_text('Original image')
+        axis[0].axis('off')
+        # np.save(os.path.join(path, 'original_img.npy'), original_img)
 
-                    axis[1].imshow(attention_mask_light)
-                    axis[1].title.set_text(f'edge na erosion {attention_mask_light.sum()}')
+        axis[1].imshow(disp[b].squeeze(0).squeeze(0).cpu().detach().numpy())
+        axis[1].title.set_text('depth imagw')
+        axis[1].axis('off')
+        # np.save(os.path.join(path, 'disp.npy'), disp[b].squeeze(0).squeeze(0).cpu().detach().numpy())
 
-                    axis[2].imshow(edges_per_attention_mask.cpu().detach().numpy() / 255)
-                    axis[2].title.set_text(f'edge per attentio mask SUM {edges_per_attention_mask.sum() / 255}')
+        axis[2].imshow(edges_overall[b].cpu().detach().numpy())
+        axis[2].title.set_text(f'all edges found after erosion{edges_overall[b].sum()}')
+        axis[2].axis('off')
+        # np.save(os.path.join(path, 'edges_overall.npy'), edges_overall[b].cpu().detach().numpy())
 
+        fig.savefig(
+            '{}/batchIDX_{}_threshold_{}_i_{}_scale{}.png'.format(path, batch_idx,
+                                                              edge_detection_threshold, i, scale))
+        plt.close('all')
 
-                    axis[3].imshow(edges_overall[b].cpu().detach().numpy())
-                    axis[3].title.set_text(f'ALLES SUM {edges_overall[b].sum()}')
-
-                    axis[4].imshow(original_img)
-                    axis[4].title.set_text('Original image')
-                    axis[4].axis('off')
-
-                    axis[5].imshow(disp[b].squeeze(0).squeeze(0).cpu().detach().numpy())
-                    axis[5].title.set_text('depth imagw')
-                    axis[5].axis('off')
-
-                    axis[6].imshow(edges_disp / 255)
-                    axis[6].title.set_text('edges')
-                    axis[6].axis('off')
-
-                    # print("save", path)
-
-                    fig.savefig(
-                        '{}/batchIDX_{}_threshold_{}_i_{}_scale{}.png'.format(path, batch_idx,
-                                                                          edge_detection_threshold, i, scale))
-                    plt.close('all')
+    # if batch_idx % save_plot_every == 0 and b == 0:
+    #
+    #     original_img = inputs["color_aug", 0, 0][b]
+    #
+    #     original_img = np.array(original_img.squeeze().cpu().detach().permute(1, 2, 0).numpy())
+    #     np.save(os.path.join(path, 'original_img.npy'), original_img)
+    #
+    #     fig, axis = plt.subplots(4, 1, figsize=(12, 12))
+    #
+    #     axis[0].imshow(original_img)
+    #     axis[0].title.set_text('Original image')
+    #     axis[0].axis('off')
+    #     np.save(os.path.join(path, 'original_img.npy'), original_img)
+    #
+    #     axis[1].imshow(disp[b].squeeze(0).squeeze(0).cpu().detach().numpy())
+    #     axis[1].title.set_text('depth image')
+    #     axis[1].axis('off')
+    #     np.save(os.path.join(path, 'disp.npy'), disp[b].squeeze(0).squeeze(0).cpu().detach().numpy())
+    #
+    #     axis[2].imshow(edges_overall[b].cpu().detach().numpy())
+    #     axis[2].title.set_text(f'edge overall with erions {edges_overall[b].sum()}')
+    #     axis[2].axis('off')
+    #     np.save(os.path.join(path, 'edges_overall_light.npy'), edges_overall[b].cpu().detach().numpy())
+    #
+    #     axis[3].imshow(edges_overall_test[b].cpu().detach().numpy())
+    #     axis[3].title.set_text(f'edges overal without erosion {edges_overall_test[b].sum()}')
+    #     axis[3].axis('off')
+    #     np.save(os.path.join(path, 'edges_overall_test.npy'), edges_overall_test[b].cpu().detach().numpy())
+    #
+    #
+    #     # print("save", path)
+    #
+    #     fig.savefig(
+    #         '{}/batchIDX_{}_threshold_{}_i_{}_scale{}.png'.format(path, batch_idx,
+    #                                                           edge_detection_threshold, i, scale))
+    #     plt.close('all')
 
     return edges_overall.sum()
 
