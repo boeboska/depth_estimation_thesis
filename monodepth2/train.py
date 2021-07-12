@@ -17,7 +17,7 @@ from options import MonodepthOptions
 def experiment_training():
 
 
-    experiment_names = ["experiment#33", "experiment#34"]
+    experiment_names = ["experiment#35"]
 
     for current_model_name in experiment_names:
 
@@ -30,13 +30,9 @@ def experiment_training():
         options = MonodepthOptions()
         opts = options.parse()
 
-        if current_model_name == "experiment#33":
-            opts.attention_mask_loss = True
-        else:
-            opts.attention_mask_loss = False
 
         opts.model_name = current_model_name
-        opts.self_attention = True
+        opts.edge_loss = True
 
         opts.seed = 0
         opts.batch_size = 4
@@ -58,4 +54,4 @@ if __name__ == "__main__":
     # try:
     # trainer.val_all()
     # trainer.train()
-    # # except:
+    # except:
