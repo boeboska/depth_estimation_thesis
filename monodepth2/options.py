@@ -113,6 +113,9 @@ class MonodepthOptions:
                                  help="log directory",
                                  default="monodepth_models/")
                                  # default=os.path.join(os.path.expanduser("~"), "tmp"))
+        self.parser.add_argument('--image_path',
+                                 type=str,
+                                 help='path to a test image or folder of images', required=False)
 
         # TRAINING options
         self.parser.add_argument("--model_name",

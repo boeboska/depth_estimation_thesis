@@ -6,6 +6,14 @@ import numpy as np
 from torch import nn
 from torch.nn import functional as F
 import functools
+import matplotlib
+import matplotlib.pyplot as plt
+from random import randrange
+import numpy as np
+import time
+import seaborn as sns
+import copy
+import itertools
 # from inplace_abn.bn import InPlaceABNSync, InPlaceABN
 
 # ABN_module = InPlaceABN
@@ -29,6 +37,11 @@ class _SelfAttentionBlock(nn.Module):
 
     def __init__(self, in_channels, key_channels, value_channels, out_channels=None, scale=1):
         super(_SelfAttentionBlock, self).__init__()
+        #
+        # self.log_dir = log_dir
+        # self.model_name = model_name
+        # self.batch_idx = batch_idx
+        #
         self.scale = scale
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -36,7 +49,10 @@ class _SelfAttentionBlock(nn.Module):
         self.value_channels = value_channels
         if out_channels is None:
             self.out_channels = in_channels
+
+
         self.pool = nn.MaxPool2d(kernel_size=(scale, scale))
+
         self.f_key = nn.Sequential(
             nn.Conv2d(in_channels=self.in_channels, out_channels=self.key_channels,
                       kernel_size=1, stride=1, padding=0),
@@ -63,55 +79,75 @@ class _SelfAttentionBlock(nn.Module):
         # 1, 6, 20 >>> 24 , 80
         batch_size, h, w = x.size(0), x.size(2), x.size(3)
 
-        # breakpoint()
-
         # scale = 2
         if self.scale > 1:
 
-            # 1, 256, 3, 10
+            # 1, 256, 12, 40
             x = self.pool(x)
 
         # 1, 256, 30
-        value = self.f_value(x).view(batch_size, self.value_channels, -1)
+        value = self.f_value(x) # 1, 256, 12, 40
+        # breakpoint()
+        visualize_value = F.upsample(input=value, size=(h, w), mode='bilinear', align_corners=True)
+
+
+        value = value.view(batch_size, self.value_channels, -1) # 1, 256, 480
         # 1, 30, 256
         value = value.permute(0, 2, 1)
 
-        # f_query(x)  = 1, 128, 3, 10 >>>  .view() >> 1, 128, 30
 
-        # 1, 256, 12, 40
-        query = self.f_query(x).view(batch_size, self.key_channels, -1)
-        # 1, 30, 128
+        #  x =   1, 256, 12, 40
+        query = self.f_query(x) # 1, 128, 12, 40
+        query_test = query.clone()
 
-        query = query.permute(0, 2, 1)
+        # h, w = 24, 80
+        visualize_query = F.upsample(input=query, size=(h, w), mode='bilinear', align_corners=True)
+
+        query = query.view(batch_size, self.key_channels, -1) # 1, 128, 480
+
+        query = query.permute(0, 2, 1) # 1, 480, 128
+
+
+        key = self.f_key(x) # 1, 128, 12, 40
+        key_test = key.clone()
+
+        # h, w = 24, 80
+        visualize_key = F.upsample(input=key, size=(h, w), mode='bilinear', align_corners=True) # 1, 128, 24, 80
+
+        key = key.view(batch_size, self.key_channels, -1) # 1, 128, 480
+
+        # query, key = 1, 480, 128 AND 1, 128, 480
+        sim_map = torch.matmul(query, key) # 1, 480, 480
 
         # breakpoint()
-        # f_key(x) = 1, 128, 3, 10 >> .view() >>> 1, 128, 30
-        key = self.f_key(x).view(batch_size, self.key_channels, -1)
-
-        # breakpoint()
-        # query 1, 30, 128    key 1, 128, 30
-        # breakpoint()
-        sim_map = torch.matmul(query, key) # 1, 30, 30
 
         # 0.088 * sim map
         sim_map = (self.key_channels ** -.5) * sim_map
 
-        sim_map = F.softmax(sim_map, dim=-1) # 1, 30, 30
+        sim_map = F.softmax(sim_map, dim=-1) # 1, 480, 480
+
+        visualize_sim_map = sim_map.view(480, 12, 40)
 
         # breakpoint()
-        # sim_map 1, 30, 30   value 1, 30, 256
-        context = torch.matmul(sim_map, value) # 1, 30, 256
-        context = context.permute(0, 2, 1).contiguous() # 1, 256, 30
-        # breakpoint()
+
+        # sim_map 1, 480, 480   value 1, 480, 256
+        context = torch.matmul(sim_map, value) # 1, 480, 256
+        context = context.permute(0, 2, 1).contiguous() # 1, 256, 480
+
         context = context.view(batch_size, self.value_channels, *x.size()[2:]) # 1, 256, 3, 10
-        # breakpoint()
+
         context = self.W(context)
+
 
         # self.scale = 2
         if self.scale > 1:
             context = F.upsample(input=context, size=(h, w), mode='bilinear', align_corners=True)
-        # print("NA UPSAMPLE", context.shape)
-        return context
+
+
+        #context =  1, 256, 24, 80
+        # 1/0
+        visualize_sim_map = None
+        return context, visualize_query, visualize_key, visualize_value, visualize_sim_map
 
 
 class SelfAttentionBlock2D(_SelfAttentionBlock):
@@ -201,16 +237,18 @@ class BaseOC_Context_Module(nn.Module):
         # feats = 1, 256, 6, 20
 
         # there is only 1 stage
-        priors = [stage(feats) for stage in self.stages]
+        for stage in self.stages:
+            context, visualize_query, visualize_key, visualize_value, sim_map = stage(feats)
+        # context, visualize_query, visualize_key, visualize_value, sim_map = [stage(feats) for stage in self.stages]
 
         # breakpoint()
-        context = priors[0]  # 1, 256, 24, 80
+        # context = priors[0]  # 1, 256, 24, 80
 
 
         # thisone is not performed
-        for i in range(1, len(priors)):
-
-            context += priors[i]
+        # for i in range(1, len(priors)):
+        #
+        #     context += priors[i]
 
         # contecxt = 1, 256, 24, 80
 
@@ -218,4 +256,4 @@ class BaseOC_Context_Module(nn.Module):
 
         # output 1, 256, 24, 80
 
-        return output
+        return output, visualize_query, visualize_key, visualize_value, sim_map

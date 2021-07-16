@@ -87,14 +87,9 @@ class Trainer:
 
         self.use_pose_net = not (self.opt.use_stereo and self.opt.frame_ids == [0])
 
-        # breakpoint()
-
         if self.opt.use_stereo:
             self.opt.frame_ids.append("s")
 
-        # print("ATTENTION", self.opt.self_attention)
-        # breakpoint()
-        # if you want to use self attention
         if self.opt.self_attention == True:
             self.models["encoder"] = networks.ResnetEncoderSelfAttention(
                 self.opt.num_layers, self.opt.weights_init == "pretrained", top_k=self.opt.top_k)
@@ -345,7 +340,16 @@ class Trainer:
         print("Training")
         self.set_train()
 
+        # self.pose_depth_info = {}
+
         for batch_idx, inputs in enumerate(self.train_loader):
+
+            # print("IDX ", batch_idx)
+
+
+            # if batch_idx % 250 == 0:
+            #     with open('validation_all/' + 'pose_depth_info' + str(batch_idx) + '.pkl', 'wb') as f:
+            #         pickle.dump(self.pose_depth_info, f, pickle.HIGHEST_PROTOCOL)
 
 
             # print("IDX", batch_idx)
@@ -412,7 +416,7 @@ class Trainer:
             if self.opt.top_k > 0:
                 # feed the three kitti images to the decoder
                 # breakpoint()
-                features = self.models["encoder"](inputs["color_aug", 0, 0], masks = inputs['top_k_masks'])
+                features = self.models["encoder"](inputs["color_aug", 0, 0], masks = inputs['top_k_masks'], batch_idx = batch_idx)
 
             else:
                 # Otherwise, we only feed the image with frame_id 0 through the depth encoder
@@ -423,7 +427,7 @@ class Trainer:
                 if self.opt.self_attention:
                     # print("ENCODER SELF ATTENTION GA IK DOEN")
 
-                    features, attention_maps = self.models["encoder"](inputs["color_aug", 0, 0])
+                    features, attention_maps = self.models["encoder"](inputs["color_aug", 0, 0], batch_idx = batch_idx, inputs = inputs)
                 else:
 
                     features = self.models["encoder"](inputs["color_aug", 0, 0])
@@ -444,14 +448,14 @@ class Trainer:
 
         # TRUE
         if self.use_pose_net:
-            outputs.update(self.predict_poses(inputs, features))
+            outputs.update(self.predict_poses(inputs, features, batch_idx))
 
-        self.generate_images_pred(inputs, outputs)
+        self.generate_images_pred(inputs, outputs, batch_idx)
         losses = self.compute_losses(inputs, outputs, batch_idx)
 
         return outputs, losses
 
-    def predict_poses(self, inputs, features):
+    def predict_poses(self, inputs, features, batch_idx):
         """Predict poses between input frames for monocular sequences.
         """
         outputs = {}
@@ -484,12 +488,17 @@ class Trainer:
                         pose_inputs = torch.cat(pose_inputs, 1)
 
                     axisangle, translation = self.models["pose"](pose_inputs)
+
+                    # self.pose_depth_info[str(batch_idx) + 'axisangle'] = axisangle.reshape(6)
+                    # self.pose_depth_info[str(batch_idx) + 'translation'] = translation.reshape(6)
+
                     outputs[("axisangle", 0, f_i)] = axisangle
                     outputs[("translation", 0, f_i)] = translation
 
                     # breakpoint()
 
                     # Invert the matrix if the frame id is negative
+                    # select the first 3 axis angle and trans params
                     outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
                         axisangle[:, 0], translation[:, 0], invert=(f_i < 0))
 
@@ -677,7 +686,7 @@ class Trainer:
             fig.savefig('{}/epoch_{}_batch_idx_{}_batch_{}.png'.format(path, self.epoch, batch_idx, b))
             plt.close(fig)
 
-    def generate_images_pred(self, inputs, outputs):
+    def generate_images_pred(self, inputs, outputs, batch_idx):
         """Generate the warped (reprojected) color images for a minibatch.
         Generated images are saved into the `outputs` dictionary.
         """
@@ -701,7 +710,15 @@ class Trainer:
                 else:
                     T = outputs[("cam_T_cam", 0, frame_id)]
 
+                    # self.pose_depth_info[str(batch_idx) + 'T'] = T[0]
+
+
+                # breakpoint()
+
                 # from the authors of https://arxiv.org/abs/1712.00175
+                # breakpoint()
+
+                # FALSE
                 if self.opt.pose_model_type == "posecnn":
 
                     axisangle = outputs[("axisangle", 0, frame_id)]
@@ -712,6 +729,7 @@ class Trainer:
 
                     T = transformation_from_parameters(
                         axisangle[:, 0], translation[:, 0] * mean_inv_depth[:, 0], frame_id < 0)
+
 
                 cam_points = self.backproject_depth[source_scale](
                     depth, inputs[("inv_K", source_scale)])
@@ -847,6 +865,9 @@ class Trainer:
                 source_scale = 0
 
             disp = outputs[("disp", scale)]
+            # if scale == 0:
+                # breakpoint()
+                # self.pose_depth_info[str(batch_idx) + 'disp'] = [round(torch.min(disp).item(), 2), round(torch.max(disp).item(), 2), round(torch.mean(disp).item(), 2), round(torch.std(disp).item(), 2)]
             color = inputs[("color", 0, scale)]
             target = inputs[("color", 0, source_scale)]
 
@@ -858,6 +879,9 @@ class Trainer:
                 reprojection_losses.append(self.compute_reprojection_loss(pred, target))
 
             reprojection_losses = torch.cat(reprojection_losses, 1)
+
+            if scale == 0 and batch_idx % self.opt.save_plot_every == 0:
+                plot_tensor_begin_training(self, inputs, outputs, batch_idx, scale, reprojection_losses)
 
             if self.opt.edge_loss:
 

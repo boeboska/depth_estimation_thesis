@@ -18,6 +18,12 @@ from networks.prepare_self_attention import PREPARE_SELF_ATTENTION_MODULE
 
 from networks.util import conv3x3, Bottleneck
 
+import matplotlib.pyplot as plt
+import matplotlib
+import os
+from random import randrange
+import seaborn as sns
+
 
 affine_par = True
 
@@ -86,6 +92,8 @@ class ResnetEncoderSelfAttention(nn.Module):
     """
     def __init__(self, num_layers, pretrained, num_input_images=1, top_k=0):
         super(ResnetEncoderSelfAttention, self).__init__()
+
+        # self.batch_idx = batch_idx
 
         # self.num_ch_enc = np.array([128, 256, 512, 1024, 2048])
         self.num_ch_enc = np.array([64, 64, 128, 256, 512])
@@ -169,13 +177,10 @@ class ResnetEncoderSelfAttention(nn.Module):
     #             block(self.inplanes, planes, dilation=dilation, multi_grid=generate_multi_grid(i, multi_grid)))
     #     return nn.Sequential(*layers)
 
-    def forward(self, input_image, masks = None):
+    def forward(self, input_image, batch_idx, inputs, masks = None):
         self.features = []
         x = (input_image - 0.45) / 0.225
 
-        # print("num input img", self.num_input_images) print("top k  en masks", self.top_k, masks.shape)
-        # if self.top_k > 0 and self.num_input_images != 2 and masks is not None:
-        #     x = torch.cat((x, masks), dim = 1)
 
         x = self.encoder.conv1(x)
         x = self.encoder.bn1(x)
@@ -189,10 +194,88 @@ class ResnetEncoderSelfAttention(nn.Module):
         # breakpoint()
         # pre_self_attention_features = self.prepare_self_attention(self.features[1]) # 1, 512, 48, 160
 
-        self.features[-1] = self.context(self.features[-1])  # attention maps > 1, 256, 48, 160
+        output, feat1, visualize_query, visualize_key, visualize_value, sim_map = self.context(self.features[-1])
 
         # breakpoint()
-        attention_maps = self.features[-1] # 1, 512, 24, 80
+        # breakpoint()
+
+        self.features[-1] = output
+        attention_maps = output
+
+        # self.features[-1] = self.context(self.features[-1])  # attention maps > 1, 256, 48, 160
+
+        # breakpoint()
+        # attention_maps = self.features[-1] # 1, 512, 24, 80
+
+        # during label checking None is returned
+        # if inputs is not None and batch_idx is not None:
+        #     path = 'monodepth_models/14_07/vis_query'
+        #     # path = self.log_dir + self.model_name + "/" + "vis_query/"
+        #     if not os.path.exists(path):
+        #         os.makedirs(path)
+        #
+        #     path = f'{path}/{batch_idx}'
+        #     if not os.path.exists(path):
+        #         os.makedirs(path)
+        #
+        #     for x in range(10):
+        #         rand_nr = randrange(visualize_query.shape[1])
+        #
+        #         fig, axis = plt.subplots(7, 1, figsize=(10, 15))
+        #
+        #         original_img = inputs["color_aug", 0, 0]
+        #
+        #         original_img = np.array(original_img[0].squeeze().cpu().detach().permute(1, 2, 0).numpy())
+        #         axis[0].set_title('Kitti image', fontdict={'fontsize': 20, 'fontweight': 'bold'})
+        #         axis[0].axis('off')
+        #         axis[0].imshow(original_img)
+        #
+        #
+        #
+        #         axis[1].set_title('query ', fontdict={'fontsize': 20, 'fontweight': 'bold'})
+        #         axis[1].axis('off')
+        #         sns.heatmap(visualize_query[0][rand_nr].cpu().detach().numpy(), ax=axis[1], vmin=0, vmax=0.5, cmap='Greens',
+        #                     center=0.25)
+        #         # np.save(os.path.join(path, 'query.npy'), visualize_query[0][rand_nr].cpu().detach().numpy())
+        #
+        #         axis[2].set_title('key ', fontdict={'fontsize': 20, 'fontweight': 'bold'})
+        #         axis[2].axis('off')
+        #         sns.heatmap(visualize_key[0][rand_nr].cpu().detach().numpy(), ax=axis[2], vmin=0, vmax=0.5, cmap='Greens',
+        #                     center=0.25)
+        #         # np.save(os.path.join(path, 'key.npy'), visualize_key[0][rand_nr].cpu().detach().numpy())
+        #
+        #         axis[3].set_title('value ', fontdict={'fontsize': 20, 'fontweight': 'bold'})
+        #         axis[3].axis('off')
+        #         sns.heatmap(visualize_value[0][rand_nr].cpu().detach().numpy(), ax=axis[3], vmin=0, vmax=0.5, cmap='Greens',
+        #                     center=0.25)
+        #         # np.save(os.path.join(path, 'value.npy'), visualize_value[0][rand_nr].cpu().detach().numpy())
+        #
+        #         axis[4].set_title('sim map ', fontdict={'fontsize': 20, 'fontweight': 'bold'})
+        #         axis[4].axis('off')
+        #         sns.heatmap(sim_map[0].cpu().detach().numpy(), ax=axis[4], vmin=0, vmax=0.01, cmap='Greens',
+        #                     center=0.005)
+        #         # np.save(os.path.join(path, 'sim_map.npy'), sim_map[0].cpu().detach().numpy())
+        #
+        #         axis[5].set_title('attention map w/o dial ', fontdict={'fontsize': 20, 'fontweight': 'bold'})
+        #         axis[5].axis('off')
+        #         sns.heatmap(feat1[0][rand_nr].cpu().detach().numpy(), ax=axis[5], vmin=0, vmax=0.1, cmap='Greens',
+        #                     center=0.05)
+        #         # np.save(os.path.join(path, 'feat_1.npy'), feat1[0][rand_nr].cpu().detach().numpy())
+        #
+        #         axis[6].set_title('attention map w dialiation ', fontdict={'fontsize': 20, 'fontweight': 'bold'})
+        #         axis[6].axis('off')
+        #         sns.heatmap(output[0][rand_nr].cpu().detach().numpy(), ax=axis[6], vmin=0, vmax=2, cmap='Greens',
+        #                     center=1)
+        #         # np.save(os.path.join(path, 'attention_map.npy'), output[0][rand_nr].cpu().detach().numpy())
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #         fig.savefig(f'{path}/batch_idx_{batch_idx}_rand{rand_nr}.png')
+        #         plt.close(fig)
 
 
         # all features[-1] dit is nu de self attention ding ... 1, 512, 24, 80 PAPER (h/8, w/8 , 512)

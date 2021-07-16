@@ -87,6 +87,7 @@ class ASP_OC_Module(nn.Module):
         # x 1,, 512, 24, 80 paper
         # x 1, 512, 6, 20
         # TRUE
+        # print("HIER BATH", batch_idx)
 
         # print("IK GA FORQQWARD DIALATION AND SELF ATTNEITON")
         if isinstance(x, Variable):
@@ -98,7 +99,10 @@ class ASP_OC_Module(nn.Module):
         else:
             raise RuntimeError('unknown input type')
 
-        feat1 = self.context_oc(x)
+
+
+        feat1, visualize_query, visualize_key, visualize_value, sim_map = self.context_oc(x)
+
         # breakpoint()
             # feat 1 is the feature from the self attention block
 
@@ -124,4 +128,4 @@ class ASP_OC_Module(nn.Module):
         output = self.conv_bn_dropout(out)  # 1, 512, 24, 80 ... thisone 1, 512, 6, 20
 
 
-        return output
+        return output, feat1, visualize_query, visualize_key, visualize_value, sim_map
