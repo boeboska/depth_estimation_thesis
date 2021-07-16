@@ -126,7 +126,7 @@ class _SelfAttentionBlock(nn.Module):
 
         sim_map = F.softmax(sim_map, dim=-1) # 1, 480, 480
 
-        visualize_sim_map = sim_map.view(480, 12, 40)
+        # visualize_sim_map = sim_map.view(480, 12, 40)
 
         # breakpoint()
 
