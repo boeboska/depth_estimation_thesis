@@ -623,7 +623,7 @@ class Trainer:
 
             # print("IDX", batch_idx)
 
-            if batch_idx % 10 == 0:
+            if batch_idx % 250 == 0:
                 print(batch_idx)
             with torch.no_grad():
 
@@ -637,10 +637,10 @@ class Trainer:
 
                 loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
 
-            if batch_idx == 10:
+            # if batch_idx == 10:
         # save the dictionary
-                with open('validation_all/' + current_model + 'dial_around_edge' + '.pkl', 'wb') as f:
-                    pickle.dump(loss_per_mask_size, f, pickle.HIGHEST_PROTOCOL)
+        with open('validation_all/' + current_model + 'dial_around_edge' + '.pkl', 'wb') as f:
+            pickle.dump(loss_per_mask_size, f, pickle.HIGHEST_PROTOCOL)
 
         # save list
         # validation_edge_loss = np.array(validation_edge_loss)
