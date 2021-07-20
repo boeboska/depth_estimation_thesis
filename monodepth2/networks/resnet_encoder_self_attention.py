@@ -23,7 +23,7 @@ import matplotlib
 import os
 from random import randrange
 import seaborn as sns
-
+from random import randrange
 
 affine_par = True
 
@@ -177,7 +177,7 @@ class ResnetEncoderSelfAttention(nn.Module):
     #             block(self.inplanes, planes, dilation=dilation, multi_grid=generate_multi_grid(i, multi_grid)))
     #     return nn.Sequential(*layers)
 
-    def forward(self, input_image, batch_idx, inputs, masks = None):
+    def forward(self, input_image, batch_idx, inputs, hist_dict, masks = None):
         self.features = []
         x = (input_image - 0.45) / 0.225
 
@@ -191,16 +191,63 @@ class ResnetEncoderSelfAttention(nn.Module):
         self.features.append(self.encoder.layer3(self.features[-1])) # 1, 256, 12, 40 >> 24, 80
         self.features.append(self.encoder.layer4(self.features[-1])) # 1, 512, 6, 20 >> 24, 80
 
-        # breakpoint()
-        # pre_self_attention_features = self.prepare_self_attention(self.features[1]) # 1, 512, 48, 160
 
         output, feat1, visualize_query, visualize_key, visualize_value, sim_map = self.context(self.features[-1])
 
-        # breakpoint()
-        # breakpoint()
 
         self.features[-1] = output
         attention_maps = output
+
+        # only during training .. not during valdiation
+        if hist_dict != None:
+
+            for x in range(15):
+
+
+                rand_nr = randrange(attention_maps.shape[1])
+
+                for i in range(len(list(hist_dict.keys()))):
+
+                    # breakpoint()
+
+                    print("ii", i)
+
+                    # make sure you also get items > 4
+                    if list(hist_dict.keys())[i + 1] == list(hist_dict.keys())[-1]:
+                        print("BIJ DE LAATSTE")
+
+                        list(hist_dict.keys())[i + 1] = np.inf
+
+
+                    # take current attention map and filter on nonzero values
+                    temp = attention_maps.squeeze()[rand_nr][attention_maps.squeeze()[rand_nr] > 0].cpu().clone()
+
+                    # sort the attention mask in bins
+                    temp = temp[temp > list(hist_dict.keys())[i]]
+                    temp = temp[temp < list(hist_dict.keys())[i + 1]]
+
+
+                    curr = hist_dict[list(hist_dict.keys())[i]]
+
+                    # breakpoint()
+                    # how many % of the whole image contains such high value
+                    curr.append( temp.shape[0] / (attention_maps.shape[2] + attention_maps.shape[3]))
+
+                    hist_dict[list(hist_dict.keys())[i]] = curr
+
+
+
+                    if list(hist_dict.keys())[i + 1] == np.inf:
+                        print("IK GA BREAKEN")
+                        break
+
+            # if x.item() == 0:
+            #     print("HAAA")
+            # divider = np.floor(x.item() / 0.05)
+            # pos_in_dict = divider * 0.05
+
+
+            # hist_dict[pos_in_dict] += 1
 
         # self.features[-1] = self.context(self.features[-1])  # attention maps > 1, 256, 48, 160
 
@@ -313,7 +360,7 @@ class ResnetEncoderSelfAttention(nn.Module):
         #
         # breakpoint()
 
-        return self.features, attention_maps
+        return self.features, attention_maps, hist_dict
 
 
         # return self.features

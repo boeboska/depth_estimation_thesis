@@ -340,16 +340,28 @@ class Trainer:
         print("Training")
         self.set_train()
 
+        hist_dict = {}
+
+        fill = np.arange(0, 5, 0.05)
+        for number in fill:
+            hist_dict[number] = []
+
         # self.pose_depth_info = {}
 
         for batch_idx, inputs in enumerate(self.train_loader):
 
-            # print("IDX ", batch_idx)
+            print("IDX ", batch_idx)
+            # breakpoint()
 
 
-            # if batch_idx % 250 == 0:
-            #     with open('validation_all/' + 'pose_depth_info' + str(batch_idx) + '.pkl', 'wb') as f:
-            #         pickle.dump(self.pose_depth_info, f, pickle.HIGHEST_PROTOCOL)
+
+
+            if batch_idx % 100 == 0:
+
+                weight_folder = self.opt.load_weights_folder.split('monodepth_models/')[1].split('/')[0]
+
+                with open('validation_all/'  +  'hist_dict_attention_map_' + str(weight_folder) + '_' + str(batch_idx) + '.pkl', 'wb') as f:
+                    pickle.dump(hist_dict, f, pickle.HIGHEST_PROTOCOL)
 
 
             # print("IDX", batch_idx)
@@ -357,7 +369,7 @@ class Trainer:
 
             before_op_time = time.time()
 
-            outputs, losses = self.process_batch(inputs, batch_idx)
+            outputs, losses, hist_dict = self.process_batch(inputs, batch_idx, hist_dict)
 
             self.model_optimizer.zero_grad()
             losses["loss"].backward()
@@ -378,7 +390,7 @@ class Trainer:
                 self.log("train", inputs, outputs, losses)
 
                 # print("ik ga valideren")
-                self.val_losses.append(self.val(inputs, batch_idx))
+                self.val_losses.append(self.val(inputs, batch_idx, hist_dict))
                 if len(self.val_losses) >= 4:
                     message = self.early_stopping_check(batch_idx)
                     if message == "stop":
@@ -389,7 +401,7 @@ class Trainer:
 
 
 
-    def process_batch(self, inputs, batch_idx):
+    def process_batch(self, inputs, batch_idx, hist_dict):
         """Pass a minibatch through the network and generate images and losses
         """
         for key, ipt in inputs.items():
@@ -427,7 +439,7 @@ class Trainer:
                 if self.opt.self_attention:
                     # print("ENCODER SELF ATTENTION GA IK DOEN")
 
-                    features, attention_maps = self.models["encoder"](inputs["color_aug", 0, 0], batch_idx = batch_idx, inputs = inputs)
+                    features, attention_maps, hist_dict = self.models["encoder"](inputs["color_aug", 0, 0], batch_idx = batch_idx, inputs = inputs, hist_dict = hist_dict)
                 else:
 
                     features = self.models["encoder"](inputs["color_aug", 0, 0])
@@ -435,8 +447,8 @@ class Trainer:
             if self.opt.self_attention:
                 outputs = self.models["depth"](features, attention_maps)
 
-                if batch_idx % self.opt.save_plot_every == 0:
-                    save_self_attention_masks(inputs, outputs, batch_idx, self.epoch, self.opt.model_name, self.opt.log_dir)
+                # if batch_idx % self.opt.save_plot_every == 0:
+                #     save_self_attention_masks(inputs, outputs, batch_idx, self.epoch, self.opt.model_name, self.opt.log_dir)
 
             else:
 
@@ -453,7 +465,7 @@ class Trainer:
         self.generate_images_pred(inputs, outputs, batch_idx)
         losses = self.compute_losses(inputs, outputs, batch_idx)
 
-        return outputs, losses
+        return outputs, losses, hist_dict
 
     def predict_poses(self, inputs, features, batch_idx):
         """Predict poses between input frames for monocular sequences.
@@ -608,12 +620,14 @@ class Trainer:
 
         # loop over all the validation images
         for batch_idx, inputs in enumerate(self.val_loader):
-            # print(batch_idx)
-            if batch_idx % 250 == 0:
+
+            # print("IDX", batch_idx)
+
+            if batch_idx % 10 == 0:
                 print(batch_idx)
             with torch.no_grad():
 
-                outputs, losses = self.process_batch(inputs, batch_idx)
+                outputs, losses, hist_dict  = self.process_batch(inputs, batch_idx, hist_dict = None)
 
                 # add edge loss for current image
                 # validation_edge_loss.append(losses['loss'])
@@ -623,10 +637,10 @@ class Trainer:
 
                 loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
 
-            # if batch_idx == 10:
+            if batch_idx == 10:
         # save the dictionary
-        with open('validation_all/' + current_model + 'dial_around_edge' + '.pkl', 'wb') as f:
-            pickle.dump(loss_per_mask_size, f, pickle.HIGHEST_PROTOCOL)
+                with open('validation_all/' + current_model + 'dial_around_edge' + '.pkl', 'wb') as f:
+                    pickle.dump(loss_per_mask_size, f, pickle.HIGHEST_PROTOCOL)
 
         # save list
         # validation_edge_loss = np.array(validation_edge_loss)
@@ -634,7 +648,7 @@ class Trainer:
 
         return None
 
-    def val(self, inputs, batch_idx):
+    def val(self, inputs, batch_idx, hist_dict):
         """Validate the model on a single minibatch
         """
         self.set_eval()
@@ -646,7 +660,7 @@ class Trainer:
 
         with torch.no_grad():
             # breakpoint()
-            outputs, losses = self.process_batch(inputs, batch_idx)
+            outputs, losses, hist_dict = self.process_batch(inputs, batch_idx, hist_dict)
 
             if "depth_gt" in inputs:
                 self.compute_depth_losses(inputs, outputs, losses)
