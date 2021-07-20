@@ -34,6 +34,7 @@ def experiment_training():
 
             print(f'validation_all/{current_model_name}/{epoch}')
 
+            # opts.load_weights_folder = f'validation_all/{current_model_name}/models/{epoch}'
             opts.load_weights_folder = f'monodepth_models/{current_model_name}/models/{epoch}'
             opts.batch_size = 1
             opts.num_workers = 1

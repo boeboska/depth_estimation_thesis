@@ -342,16 +342,23 @@ class Trainer:
 
         hist_dict = {}
 
-        fill = np.arange(0, 5, 0.05)
-        for number in fill:
-            hist_dict[number] = []
+        weight_size = np.arange(0, 16000, 1)
+        attention_sizes = np.arange(0, 1.05, 0.05)
 
-        # self.pose_depth_info = {}
+        # 1 ... 16000
+        for weight_mask_size in weight_size:
+
+            hist_dict[weight_mask_size] = {}
+
+            # 0.05 ... 5
+            for attention_size in attention_sizes:
+                hist_dict[weight_mask_size][attention_size] = []
+
 
         for batch_idx, inputs in enumerate(self.train_loader):
 
             print("IDX ", batch_idx)
-            # breakpoint()
+
 
 
 
@@ -360,7 +367,7 @@ class Trainer:
 
                 weight_folder = self.opt.load_weights_folder.split('monodepth_models/')[1].split('/')[0]
 
-                with open('validation_all/'  +  'hist_dict_attention_map_' + str(weight_folder) + '_' + str(batch_idx) + '.pkl', 'wb') as f:
+                with open('validation_all/'  +  'hist_dict_attention_map' + str(weight_folder) + '_' + str(batch_idx) + '.pkl', 'wb') as f:
                     pickle.dump(hist_dict, f, pickle.HIGHEST_PROTOCOL)
 
 
@@ -463,7 +470,7 @@ class Trainer:
             outputs.update(self.predict_poses(inputs, features, batch_idx))
 
         self.generate_images_pred(inputs, outputs, batch_idx)
-        losses = self.compute_losses(inputs, outputs, batch_idx)
+        losses = self.compute_losses(inputs, outputs, batch_idx, hist_dict, attention_maps)
 
         return outputs, losses, hist_dict
 
@@ -605,7 +612,7 @@ class Trainer:
     def val_all(self, current_model):
         """Validate on the whole validation set"""
 
-        loss_per_mask_size = {}
+        # loss_per_mask_size = {}
         # validation_edge_loss = []
 
         # avg_dialation_size = {}
@@ -615,19 +622,31 @@ class Trainer:
         # avg_dialation_size["cover_dial_1"] = []
         # avg_dialation_size["cover_dial_3"] = []
 
+        hist_dict = {}
+
+        weight_size = np.arange(0, 16000, 1)
+        attention_sizes = np.arange(0, 1.05, 0.05)
+
+        # 1 ... 16000
+        for weight_mask_size in weight_size:
+
+            hist_dict[weight_mask_size] = {}
+
+            # 0.05 ... 5
+            for attention_size in attention_sizes:
+                hist_dict[weight_mask_size][attention_size] = []
+
         self.set_eval()
         start = time.time()
 
         # loop over all the validation images
         for batch_idx, inputs in enumerate(self.val_loader):
 
-            # print("IDX", batch_idx)
-
             if batch_idx % 250 == 0:
                 print(batch_idx)
             with torch.no_grad():
 
-                outputs, losses, hist_dict  = self.process_batch(inputs, batch_idx, hist_dict = None)
+                outputs, losses, hist_dict  = self.process_batch(inputs, batch_idx, hist_dict)
 
                 # add edge loss for current image
                 # validation_edge_loss.append(losses['loss'])
@@ -635,12 +654,15 @@ class Trainer:
 
 
 
-                loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
+                # loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
 
             # if batch_idx == 10:
+
+
+
         # save the dictionary
-        with open('validation_all/' + current_model + 'dial_around_edge' + '.pkl', 'wb') as f:
-            pickle.dump(loss_per_mask_size, f, pickle.HIGHEST_PROTOCOL)
+        with open('validation_all/' + current_model + 'hist_dict' + '.pkl', 'wb') as f:
+            pickle.dump(hist_dict, f, pickle.HIGHEST_PROTOCOL)
 
         # save list
         # validation_edge_loss = np.array(validation_edge_loss)
@@ -818,7 +840,42 @@ class Trainer:
         return attention_mask_weight, original_attention_mask, attention_masks_for_calculating_loss_inside_mask, attention_masks_for_calculating_loss_inside_mask_with_dilation_1, attention_masks_for_calculating_loss_inside_mask_with_dilation_3, amount_pixels_inside_mask
 
 
-    def compute_losses(self, inputs, outputs, batch_idx):
+    def calculate_self_attention_size(self, hist_dict, attention_maps, amount_pixels_inside_mask):
+
+        for i in range(len(list(hist_dict.keys()))):
+
+            attention_map = attention_maps.squeeze().cpu().clone()
+
+            # normalized 0-1
+            attention_map -= attention_map.min(1, keepdim=True)[0]
+            attention_map /= attention_map.max(1, keepdim=True)[0]
+
+            list_of_keys = list(hist_dict[amount_pixels_inside_mask].keys()).copy()
+
+            # make sure you also get items > 4
+            if list_of_keys[i + 1] == list_of_keys[-1]:
+                list_of_keys[i + 1] = np.inf
+
+            attention_map = (attention_map >= list_of_keys[i]) & (attention_map < list_of_keys[i + 1])
+
+            # how many % of the whole image contains such high value
+            curr = torch.div(attention_map.sum(dim=-1).sum(1).float(),
+                             (attention_maps.shape[2] * attention_maps.shape[3]))
+
+            current_list = hist_dict[amount_pixels_inside_mask][list_of_keys[i]]
+            current_list.append( torch.mean(curr).item() )
+
+            hist_dict[amount_pixels_inside_mask][list_of_keys[i]] = current_list
+
+
+            # now you have had all the data
+            if list_of_keys[i + 1] == np.inf:
+                break
+
+        return hist_dict
+
+
+    def compute_losses(self, inputs, outputs, batch_idx, hist_dict, attention_maps):
         """Compute the reprojection and smoothness losses for a minibatch
         """
 
@@ -852,6 +909,7 @@ class Trainer:
 
             attention_mask_weight, original_attention_masks, loss_inside_mask_tensor, loss_inside_mask_tensor_dialation_1, loss_inside_mask_tensor_dialation_3, amount_pixels_inside_mask = self.prepare_attention_masks(inputs)
 
+            hist_dict = self.calculate_self_attention_size(hist_dict, attention_maps, amount_pixels_inside_mask)
         else:
             attention_mask_weight = torch.ones(size=(self.opt.batch_size, 1, self.opt.height, self.opt.width)).to(
                 self.device)

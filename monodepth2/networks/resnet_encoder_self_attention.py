@@ -137,6 +137,7 @@ class ResnetEncoderSelfAttention(nn.Module):
 
         if num_layers > 34:
             self.num_ch_enc[1:] *= 4
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     #     layers = [3, 4, 23, 3]
     #
@@ -199,47 +200,9 @@ class ResnetEncoderSelfAttention(nn.Module):
         attention_maps = output
 
         # only during training .. not during valdiation
-        if hist_dict != None:
-
-            for x in range(15):
+        # if hist_dict != None:
 
 
-                rand_nr = randrange(attention_maps.shape[1])
-
-                for i in range(len(list(hist_dict.keys()))):
-
-                    # breakpoint()
-
-                    print("ii", i)
-
-                    # make sure you also get items > 4
-                    if list(hist_dict.keys())[i + 1] == list(hist_dict.keys())[-1]:
-                        print("BIJ DE LAATSTE")
-
-                        list(hist_dict.keys())[i + 1] = np.inf
-
-
-                    # take current attention map and filter on nonzero values
-                    temp = attention_maps.squeeze()[rand_nr][attention_maps.squeeze()[rand_nr] > 0].cpu().clone()
-
-                    # sort the attention mask in bins
-                    temp = temp[temp > list(hist_dict.keys())[i]]
-                    temp = temp[temp < list(hist_dict.keys())[i + 1]]
-
-
-                    curr = hist_dict[list(hist_dict.keys())[i]]
-
-                    # breakpoint()
-                    # how many % of the whole image contains such high value
-                    curr.append( temp.shape[0] / (attention_maps.shape[2] + attention_maps.shape[3]))
-
-                    hist_dict[list(hist_dict.keys())[i]] = curr
-
-
-
-                    if list(hist_dict.keys())[i + 1] == np.inf:
-                        print("IK GA BREAKEN")
-                        break
 
             # if x.item() == 0:
             #     print("HAAA")
