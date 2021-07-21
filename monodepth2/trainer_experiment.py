@@ -844,6 +844,9 @@ class Trainer:
 
         for i in range(len(list(hist_dict.keys()))):
 
+            if amount_pixels_inside_mask > max(hist_dict):
+                amount_pixels_inside_mask = max(hist_dict)
+
             attention_map = attention_maps.squeeze().cpu().clone()
 
             # normalized 0-1
@@ -864,8 +867,7 @@ class Trainer:
                              (attention_maps.shape[2] * attention_maps.shape[3]))
 
 
-            if amount_pixels_inside_mask > max(hist_dict):
-                amount_pixels_inside_mask = max(hist_dict)
+
             current_list = hist_dict[amount_pixels_inside_mask][list_of_keys[i]]
             current_list.append( torch.mean(curr).item() )
 
