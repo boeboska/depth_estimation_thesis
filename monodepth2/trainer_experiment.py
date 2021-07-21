@@ -850,6 +850,7 @@ class Trainer:
             attention_map -= attention_map.min(1, keepdim=True)[0]
             attention_map /= attention_map.max(1, keepdim=True)[0]
 
+            # 0.05 ... 1
             list_of_keys = list(hist_dict[amount_pixels_inside_mask].keys()).copy()
 
             # make sure you also get items > 4
@@ -862,6 +863,9 @@ class Trainer:
             curr = torch.div(attention_map.sum(dim=-1).sum(1).float(),
                              (attention_maps.shape[2] * attention_maps.shape[3]))
 
+
+            if amount_pixels_inside_mask > max(hist_dict):
+                amount_pixels_inside_mask = max(hist_dict)
             current_list = hist_dict[amount_pixels_inside_mask][list_of_keys[i]]
             current_list.append( torch.mean(curr).item() )
 
