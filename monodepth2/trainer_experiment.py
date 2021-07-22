@@ -343,7 +343,7 @@ class Trainer:
         hist_dict = {}
 
         weight_size = np.arange(0, 16000, 1)
-        attention_sizes = np.arange(0, 1.05, 0.05)
+        attention_sizes = np.arange(0, 1.01, 0.01)
 
         # 1 ... 16000
         for weight_mask_size in weight_size:
@@ -643,6 +643,8 @@ class Trainer:
         for batch_idx, inputs in enumerate(self.val_loader):
 
             if batch_idx % 250 == 0:
+                # with open('validation_all/' + current_model + str(batch_idx) +  'hist_dict' + '.pkl', 'wb') as f:
+                #     pickle.dump(hist_dict, f, pickle.HIGHEST_PROTOCOL)
                 print(batch_idx)
             with torch.no_grad():
 
@@ -840,8 +842,10 @@ class Trainer:
         return attention_mask_weight, original_attention_mask, attention_masks_for_calculating_loss_inside_mask, attention_masks_for_calculating_loss_inside_mask_with_dilation_1, attention_masks_for_calculating_loss_inside_mask_with_dilation_3, amount_pixels_inside_mask
 
 
-    def calculate_self_attention_size(self, hist_dict, attention_maps, amount_pixels_inside_mask):
+    def calculate_self_attention_size(self, hist_dict, attention_maps, amount_pixels_inside_mask, batch_idx):
 
+        all_pixels = 512 * 24 * 80
+        count = 0
         for i in range(len(list(hist_dict.keys()))):
 
             if amount_pixels_inside_mask > max(hist_dict):
@@ -849,9 +853,41 @@ class Trainer:
 
             attention_map = attention_maps.squeeze().cpu().clone()
 
+
             # normalized 0-1
             attention_map -= attention_map.min(1, keepdim=True)[0]
             attention_map /= attention_map.max(1, keepdim=True)[0]
+
+
+            # nan to 0
+            attention_map[attention_map != attention_map] = 0
+
+            # path = f'attention_map_check/'
+            # # path = self.log_dir + self.model_name + "/" + "vis_query/"
+            # if not os.path.exists(path):
+            #     os.makedirs(path)
+            #
+            # fig, axis = plt.subplots(11, 2, figsize=(30, 40))
+            # for x in range(10):
+            #     # for y in range(2):
+            #
+            #     rand_nr = randrange(attention_map.shape[0])
+            #
+            #     axis[x+1, 0].set_title(f'attention map')
+            #     axis[x+1, 0].axis('off')
+            #     # axis[x+1, 0].imshow(attention_map_eerst[rand_nr].cpu().detach().numpy())
+            #     sns.heatmap(attention_map_eerst[rand_nr].cpu().detach().numpy(), ax=axis[x+1, 0], vmin=0, vmax=torch.max(attention_map_eerst[rand_nr]).item(), cmap='Greens', cbar=False)
+            #
+            #
+            #     axis[x+1, 1].set_title(f'normalized map')
+            #     axis[x+1, 1].axis('off')
+            #     axis[x + 1, 1].imshow(attention_map[rand_nr].cpu().detach().numpy())
+            #     sns.heatmap(attention_map[rand_nr].cpu().detach().numpy(), ax=axis[x+1, 1], vmin=0, vmax=1, cmap='Greens', cbar=False)
+            #
+            #
+            #
+            # fig.savefig(f'{path}_{batch_idx}_{rand_nr}.png')
+            # plt.close(fig)
 
             # 0.05 ... 1
             list_of_keys = list(hist_dict[amount_pixels_inside_mask].keys()).copy()
@@ -859,14 +895,15 @@ class Trainer:
             # make sure you also get items > 4
             if list_of_keys[i + 1] == list_of_keys[-1]:
                 list_of_keys[i + 1] = np.inf
-
+            # breakpoint()
             attention_map = (attention_map >= list_of_keys[i]) & (attention_map < list_of_keys[i + 1])
 
-            # how many % of the whole image contains such high value
+            count += attention_map.sum().item()
+
             curr = torch.div(attention_map.sum(dim=-1).sum(1).float(),
                              (attention_maps.shape[2] * attention_maps.shape[3]))
 
-
+            breakpoint()
 
             current_list = hist_dict[amount_pixels_inside_mask][list_of_keys[i]]
             current_list.append( torch.mean(curr).item() )
@@ -877,6 +914,10 @@ class Trainer:
             # now you have had all the data
             if list_of_keys[i + 1] == np.inf:
                 break
+        # breakpoint()
+
+        # check if all values of the tensor are fallen inside the thresholds
+        assert count == all_pixels, f"difference if {all_pixels - count}"
 
         return hist_dict
 
@@ -915,7 +956,7 @@ class Trainer:
 
             attention_mask_weight, original_attention_masks, loss_inside_mask_tensor, loss_inside_mask_tensor_dialation_1, loss_inside_mask_tensor_dialation_3, amount_pixels_inside_mask = self.prepare_attention_masks(inputs)
 
-            hist_dict = self.calculate_self_attention_size(hist_dict, attention_maps, amount_pixels_inside_mask)
+            hist_dict = self.calculate_self_attention_size(hist_dict, attention_maps, amount_pixels_inside_mask, batch_idx)
         else:
             attention_mask_weight = torch.ones(size=(self.opt.batch_size, 1, self.opt.height, self.opt.width)).to(
                 self.device)
