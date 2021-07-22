@@ -903,7 +903,7 @@ class Trainer:
             curr = torch.div(attention_map.sum(dim=-1).sum(1).float(),
                              (attention_maps.shape[2] * attention_maps.shape[3]))
 
-            breakpoint()
+            # breakpoint()
 
             current_list = hist_dict[amount_pixels_inside_mask][list_of_keys[i]]
             current_list.append( torch.mean(curr).item() )
