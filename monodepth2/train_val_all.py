@@ -17,8 +17,11 @@ from options import MonodepthOptions
 def experiment_training():
 
 
-    experiment_names = ["experiment#33", "experiment#34", "experiment#36", "experiment#37", "experiment#38", "experiment#39"]
-    weights = ["weights_0_batch_idx9999", "weights_1_batch_idx9999", "weights_2_batch_idx9999", "weights_3_batch_idx9999", "weights_4_batch_idx9999", "weights_5_batch_idx9999"]
+    # experiment_names = ["experiment#33", "experiment#34", "experiment#36", "experiment#37", "experiment#38", "experiment#39"]
+    # weights = ["weights_0_batch_idx9999", "weights_1_batch_idx9999", "weights_2_batch_idx9999", "weights_3_batch_idx9999", "weights_4_batch_idx9999", "weights_5_batch_idx9999"]
+
+    experiment_names = ["experiment#33", "experiment#34"]
+    weights = ["weights_5_batch_idx9999"]
 
     for current_model_name in experiment_names:
 

@@ -625,7 +625,7 @@ class Trainer:
         hist_dict = {}
 
         weight_size = np.arange(0, 16000, 1)
-        attention_sizes = np.arange(0, 1.05, 0.05)
+        attention_sizes = np.arange(0, 1.01, 0.01)
 
         # 1 ... 16000
         for weight_mask_size in weight_size:
