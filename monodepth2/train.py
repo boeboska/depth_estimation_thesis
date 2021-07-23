@@ -16,10 +16,10 @@ from options import MonodepthOptions
 
 def experiment_training():
 
-    seeds = [1, 2, 1, 2]
-    experiment_names = ["experiment#36", "experiment#37", "experiment#38", "experiment#39"]
 
-    for current_model_name, seed in zip(experiment_names, seeds):
+    experiment_names = ["experiment#40"]
+
+    for current_model_name in experiment_names:
 
         if os.path.exists('output_during_training.txt'):
             os.remove('output_during_training.txt')
@@ -32,15 +32,10 @@ def experiment_training():
 
 
         opts.model_name = current_model_name
-        opts.self_attention = True
+        opts.edge_loss = True
 
-        if current_model_name == 'experiment#36' or current_model_name == 'experiment#37':
-            opts.attention_mask_loss = True
-
-
-        opts.seed = seed
-        opts.batch_size = 6
-        opts.num_workers =6
+        opts.batch_size = 4
+        opts.num_workers = 4
         opts.num_epochs = 6
 
 

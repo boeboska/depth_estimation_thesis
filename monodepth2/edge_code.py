@@ -186,9 +186,11 @@ def edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, device, height, 
             if (edges_per_attention_mask * edges_overall[b]).sum().item() == 0 and (edges_per_attention_mask > 0).any():
 
                 edges_overall[b] += (edges_per_attention_mask / 255)
+    # breakpoint()
 
     if batch_idx % save_plot_every == 0:
 
+        print("SAVE", path)
         b = 0
 
         fig, axis = plt.subplots(3, 1, figsize=(12, 12))

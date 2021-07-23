@@ -340,35 +340,37 @@ class Trainer:
         print("Training")
         self.set_train()
 
-        hist_dict = {}
+        # hist_dict = {}
+        #
+        # weight_size = np.arange(0, 16000, 1)
+        # attention_sizes = np.arange(0, 1.01, 0.01)
+        #
+        # # 1 ... 16000
+        # for weight_mask_size in weight_size:
+        #
+        #     hist_dict[weight_mask_size] = {}
+        #
+        #     # 0.05 ... 5
+        #     for attention_size in attention_sizes:
+        #         hist_dict[weight_mask_size][attention_size] = []
 
-        weight_size = np.arange(0, 16000, 1)
-        attention_sizes = np.arange(0, 1.01, 0.01)
-
-        # 1 ... 16000
-        for weight_mask_size in weight_size:
-
-            hist_dict[weight_mask_size] = {}
-
-            # 0.05 ... 5
-            for attention_size in attention_sizes:
-                hist_dict[weight_mask_size][attention_size] = []
+        hist_dict = None
 
 
         for batch_idx, inputs in enumerate(self.train_loader):
 
-            print("IDX ", batch_idx)
+            # print("IDX ", batch_idx)
 
 
 
 
 
-            if batch_idx % 100 == 0:
-
-                weight_folder = self.opt.load_weights_folder.split('monodepth_models/')[1].split('/')[0]
-
-                with open('validation_all/'  +  'hist_dict_attention_map' + str(weight_folder) + '_' + str(batch_idx) + '.pkl', 'wb') as f:
-                    pickle.dump(hist_dict, f, pickle.HIGHEST_PROTOCOL)
+            # if batch_idx % 100 == 0:
+            #
+            #     weight_folder = self.opt.load_weights_folder.split('monodepth_models/')[1].split('/')[0]
+            #
+            #     with open('validation_all/'  +  'hist_dict_attention_map' + str(weight_folder) + '_' + str(batch_idx) + '.pkl', 'wb') as f:
+            #         pickle.dump(hist_dict, f, pickle.HIGHEST_PROTOCOL)
 
 
             # print("IDX", batch_idx)
@@ -470,6 +472,9 @@ class Trainer:
             outputs.update(self.predict_poses(inputs, features, batch_idx))
 
         self.generate_images_pred(inputs, outputs, batch_idx)
+
+        if self.opt.self_attention == False:
+            attention_maps = None
         losses = self.compute_losses(inputs, outputs, batch_idx, hist_dict, attention_maps)
 
         return outputs, losses, hist_dict
@@ -1002,18 +1007,17 @@ class Trainer:
             # if scale == 0 and batch_idx % self.opt.save_plot_every == 0:
             #     plot_tensor_begin_training(self, inputs, outputs, batch_idx, scale, reprojection_losses)
 
-            if self.opt.edge_loss:
+            # skip first epoch because depth image is not converged and edges are noise now
+            if self.opt.edge_loss == True and scale == 0 and self.epoch > 0:
 
-                if scale == 0:
+                edge_loss = edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, self.device, self.opt.height, self.opt.width, self.opt.log_dir, self.opt.model_name, self.opt.edge_detection_threshold, self.opt.save_plot_every, self.opt.batch_size).to(self.device)
 
-                    edge_loss = edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, self.device, self.opt.height, self.opt.width, self.opt.log_dir, self.opt.model_name, self.opt.edge_detection_threshold, self.opt.save_plot_every, self.opt.batch_size).to(self.device)
+                loss += self.opt.edge_weight * edge_loss * self.num_scales
 
-                    loss += self.opt.edge_weight * edge_loss * self.num_scales
+                total_edge_loss += self.opt.edge_weight * edge_loss * self.num_scales
 
-                    total_edge_loss += self.opt.edge_weight * edge_loss * self.num_scales
-
-                    # add for writing to tensorboard
-                    losses["edge_loss/{}".format(scale)] = self.opt.edge_weight * edge_loss
+                # add for writing to tensorboard
+                losses["edge_loss/{}".format(scale)] = self.opt.edge_weight * edge_loss
 
             # this statement is performed
             if not self.opt.disable_automasking:
