@@ -21,7 +21,7 @@ def experiment_training():
     # weights = ["weights_0_batch_idx9999", "weights_1_batch_idx9999", "weights_2_batch_idx9999", "weights_3_batch_idx9999", "weights_4_batch_idx9999", "weights_5_batch_idx9999"]
 
     experiment_names = ["experiment#33", "experiment#34"]
-    weights = ["weights_5_batch_idx9999"]
+    weights = ["weights_5_batch_idx9999", "weights_5_batch_idx9999"]
 
     for current_model_name in experiment_names:
 
