@@ -1019,8 +1019,8 @@ class Trainer:
 
             reprojection_losses = torch.cat(reprojection_losses, 1)
 
-            if scale == 0 and batch_idx % self.opt.save_plot_every == 0:
-                plot_tensor_begin_training(self, inputs, outputs, batch_idx, scale, reprojection_losses)
+            # if scale == 0 and batch_idx % self.opt.save_plot_every == 0:
+            #     plot_tensor_begin_training(self, inputs, outputs, batch_idx, scale, reprojection_losses)
 
             # skip first epoch because depth image is not converged and edges are noise now
             if self.opt.edge_loss == True and scale == 0 and self.epoch > 0:
