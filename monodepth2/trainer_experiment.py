@@ -340,41 +340,37 @@ class Trainer:
         print("Training")
         self.set_train()
 
-        # hist_dict = {}
-        #
-        # weight_size = np.arange(0, 16000, 1)
-        # attention_sizes = np.arange(0, 1.01, 0.01)
-        #
-        # # 1 ... 16000
-        # for weight_mask_size in weight_size:
-        #
-        #     hist_dict[weight_mask_size] = {}
-        #
-        #     # 0.05 ... 5
-        #     for attention_size in attention_sizes:
-        #         hist_dict[weight_mask_size][attention_size] = []
+        hist_dict = {}
 
-        hist_dict = None
+        weight_size = np.arange(0, 16000, 1)
+        attention_sizes = np.arange(0, 1.01, 0.01)
+
+        # 1 ... 16000
+        for weight_mask_size in weight_size:
+
+            hist_dict[weight_mask_size] = {}
+
+            # 0.05 ... 5
+            for attention_size in attention_sizes:
+                hist_dict[weight_mask_size][attention_size] = []
+
+        # hist_dict = None
 
 
         for batch_idx, inputs in enumerate(self.train_loader):
 
-            # print("IDX ", batch_idx)
+            print("IDX ", batch_idx)
 
 
 
 
+            # breakpoint()
+            if batch_idx % 50 == 0:
 
-            # if batch_idx % 100 == 0:
-            #
-            #     weight_folder = self.opt.load_weights_folder.split('monodepth_models/')[1].split('/')[0]
-            #
-            #     with open('validation_all/'  +  'hist_dict_attention_map' + str(weight_folder) + '_' + str(batch_idx) + '.pkl', 'wb') as f:
-            #         pickle.dump(hist_dict, f, pickle.HIGHEST_PROTOCOL)
-
-
-            # print("IDX", batch_idx)
-            # print(inputs.shape)
+                weight_folder = self.opt.load_weights_folder.split('monodepth_models/')[1].split('/')[0]
+                epoch_nr =self.opt.load_weights_folder.split('monodepth_models/')[1].split('weights_')[1].split('_')[0]
+                with open('validation_all/'  +  'hist_dict_attention_map' + 'exp_' + str(weight_folder) + '_' + str(batch_idx) + 'epoch_ ' + str(epoch_nr) + '.pkl', 'wb') as f:
+                    pickle.dump(hist_dict, f, pickle.HIGHEST_PROTOCOL)
 
             before_op_time = time.time()
 
@@ -593,6 +589,24 @@ class Trainer:
 
         self.set_eval()
         start = time.time()
+
+        hist_dict = {}
+
+        weight_size = np.arange(0, 16000, 1)
+        attention_sizes = np.arange(0, 1.01, 0.01)
+
+        # 1 ... 16000
+        for weight_mask_size in weight_size:
+
+            hist_dict[weight_mask_size] = {}
+
+            # 0.05 ... 5
+            for attention_size in attention_sizes:
+                hist_dict[weight_mask_size][attention_size] = []
+
+
+
+
         # loop over all the validation images
         for batch_idx, inputs in enumerate(self.test_loader):
 
@@ -601,16 +615,17 @@ class Trainer:
 
                 print(batch_idx)
             with torch.no_grad():
-                outputs, losses = self.process_batch(inputs, batch_idx)
+                outputs, losses, hist_dict = self.process_batch(inputs, batch_idx, hist_dict)
 
                 # breakpoint()
                 # edge_loss_total.append(['total_loss_without_edge'])
-                loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
+                # loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
 
 
         # save the dictionary
-        with open('validation_all/' + 'test_' + current_model + '.pkl', 'wb') as f:
-            pickle.dump(loss_per_mask_size, f, pickle.HIGHEST_PROTOCOL)
+        with open('validation_all/' + 'test_' + current_model + 'hist_dict' + '.pkl', 'wb') as f:
+            pickle.dump(hist_dict, f, pickle.HIGHEST_PROTOCOL)
+
 
         return None
 
@@ -1004,8 +1019,8 @@ class Trainer:
 
             reprojection_losses = torch.cat(reprojection_losses, 1)
 
-            # if scale == 0 and batch_idx % self.opt.save_plot_every == 0:
-            #     plot_tensor_begin_training(self, inputs, outputs, batch_idx, scale, reprojection_losses)
+            if scale == 0 and batch_idx % self.opt.save_plot_every == 0:
+                plot_tensor_begin_training(self, inputs, outputs, batch_idx, scale, reprojection_losses)
 
             # skip first epoch because depth image is not converged and edges are noise now
             if self.opt.edge_loss == True and scale == 0 and self.epoch > 0:
