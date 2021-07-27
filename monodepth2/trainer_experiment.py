@@ -340,37 +340,37 @@ class Trainer:
         print("Training")
         self.set_train()
 
-        hist_dict = {}
+        # hist_dict = {}
+        #
+        # weight_size = np.arange(0, 16000, 1)
+        # attention_sizes = np.arange(0, 1.01, 0.01)
+        #
+        # # 1 ... 16000
+        # for weight_mask_size in weight_size:
+        #
+        #     hist_dict[weight_mask_size] = {}
+        #
+        #     # 0.05 ... 5
+        #     for attention_size in attention_sizes:
+        #         hist_dict[weight_mask_size][attention_size] = []
 
-        weight_size = np.arange(0, 16000, 1)
-        attention_sizes = np.arange(0, 1.01, 0.01)
-
-        # 1 ... 16000
-        for weight_mask_size in weight_size:
-
-            hist_dict[weight_mask_size] = {}
-
-            # 0.05 ... 5
-            for attention_size in attention_sizes:
-                hist_dict[weight_mask_size][attention_size] = []
-
-        # hist_dict = None
+        hist_dict = None
 
 
         for batch_idx, inputs in enumerate(self.train_loader):
 
-            print("IDX ", batch_idx)
+            # print("IDX ", batch_idx)
 
 
 
 
             # breakpoint()
-            if batch_idx % 50 == 0:
-
-                weight_folder = self.opt.load_weights_folder.split('monodepth_models/')[1].split('/')[0]
-                epoch_nr =self.opt.load_weights_folder.split('monodepth_models/')[1].split('weights_')[1].split('_')[0]
-                with open('validation_all/'  +  'hist_dict_attention_map' + 'exp_' + str(weight_folder) + '_' + str(batch_idx) + 'epoch_ ' + str(epoch_nr) + '.pkl', 'wb') as f:
-                    pickle.dump(hist_dict, f, pickle.HIGHEST_PROTOCOL)
+            # if batch_idx % 50 == 0:
+            #
+            #     weight_folder = self.opt.load_weights_folder.split('monodepth_models/')[1].split('/')[0]
+            #     epoch_nr =self.opt.load_weights_folder.split('monodepth_models/')[1].split('weights_')[1].split('_')[0]
+            #     with open('validation_all/'  +  'hist_dict_attention_map' + 'exp_' + str(weight_folder) + '_' + str(batch_idx) + 'epoch_ ' + str(epoch_nr) + '.pkl', 'wb') as f:
+            #         pickle.dump(hist_dict, f, pickle.HIGHEST_PROTOCOL)
 
             before_op_time = time.time()
 
@@ -976,7 +976,7 @@ class Trainer:
 
             attention_mask_weight, original_attention_masks, loss_inside_mask_tensor, loss_inside_mask_tensor_dialation_1, loss_inside_mask_tensor_dialation_3, amount_pixels_inside_mask = self.prepare_attention_masks(inputs)
 
-            hist_dict = self.calculate_self_attention_size(hist_dict, attention_maps, amount_pixels_inside_mask, batch_idx)
+            # hist_dict = self.calculate_self_attention_size(hist_dict, attention_maps, amount_pixels_inside_mask, batch_idx)
         else:
             attention_mask_weight = torch.ones(size=(self.opt.batch_size, 1, self.opt.height, self.opt.width)).to(
                 self.device)

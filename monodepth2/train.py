@@ -17,9 +17,10 @@ from options import MonodepthOptions
 def experiment_training():
 
 
-    experiment_names = ["experiment#40"]
+    experiment_names = ["experiment#41", "experiment#42", "experiment#43", "experiment#44", "experiment#45", "experiment#46"]
+    seeds = [5, 6, 7, 8, 9, 10]
 
-    for current_model_name in experiment_names:
+    for current_model_name, seed in zip(experiment_names, seeds):
 
         if os.path.exists('output_during_training.txt'):
             os.remove('output_during_training.txt')
@@ -30,12 +31,19 @@ def experiment_training():
         options = MonodepthOptions()
         opts = options.parse()
 
+        if current_model_name == "experiment#41" or current_model_name == "experiment#42" or current_model_name == "experiment#43":
+            opts.attention_mask_loss = True
+        else:
+            opts.attention_mask_loss = False
+
 
         opts.model_name = current_model_name
-        opts.edge_loss = True
+        opts.self_attention = True
 
-        opts.batch_size = 4
-        opts.num_workers = 4
+        opts.seed = seed
+
+        opts.batch_size = 6
+        opts.num_workers = 6
         opts.num_epochs = 6
 
 
@@ -50,7 +58,7 @@ if __name__ == "__main__":
     # options = MonodepthOptions()
     # opts = options.parse()
     # trainer = Trainer(opts)
-    # try:
-    # trainer.val_all()
+    # # try:
+    # # trainer.val_all()
     # trainer.train()
-    # except:
+    # # except:
