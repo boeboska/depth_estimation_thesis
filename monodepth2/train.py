@@ -24,7 +24,7 @@ def experiment_training():
     if os.path.exists('output_during_training.txt'):
         os.remove('output_during_training.txt')
     open('output_during_training.txt', 'w')
-    file = open(f'log {current_model_name}.txt', 'w')
+    file = open(f'log {experiment_names[0]}.txt', 'w')
 
 
     options = MonodepthOptions()
