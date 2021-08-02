@@ -17,7 +17,7 @@ from options import MonodepthOptions
 def experiment_training():
 
 
-    experiment_names = ["experiment#40"]
+    experiment_names = ["experiment#47"]
 
     for current_model_name in zip(experiment_names):
 
