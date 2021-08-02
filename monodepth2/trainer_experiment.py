@@ -60,6 +60,7 @@ class Trainer:
     def __init__(self, options):
 
         self.opt = options
+        print(self.opt.log_dir, self.opt.model_name)
         self.log_path = os.path.join(self.opt.log_dir, self.opt.model_name)
 
         torch.manual_seed(self.opt.seed)
@@ -1023,7 +1024,8 @@ class Trainer:
             #     plot_tensor_begin_training(self, inputs, outputs, batch_idx, scale, reprojection_losses)
 
             # skip first epoch because depth image is not converged and edges are noise now
-            if self.opt.edge_loss == True and scale == 0 and self.epoch > 0:
+            # if self.opt.edge_loss == True and scale == 0 and self.epoch > 0:
+            if self.opt.edge_loss == True and scale == 0:
 
                 edge_loss = edge_detection_bob_hidde(scale, outputs, inputs, batch_idx, self.device, self.opt.height, self.opt.width, self.opt.log_dir, self.opt.model_name, self.opt.edge_detection_threshold, self.opt.save_plot_every, self.opt.batch_size).to(self.device)
 

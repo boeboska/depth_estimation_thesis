@@ -45,7 +45,7 @@ class MonodepthOptions:
         self.parser.add_argument("--save_plot_every",
                                  type=int,
                                  help="how often to save edge loss or additional weight loss images during training",
-                                 default=10000)
+                                 default=500)
         self.parser.add_argument("--edge_detection_threshold",
                                  type=float,
                                  help="The threshold used for canny edge detection. The lower the number the easier it will find edges",
