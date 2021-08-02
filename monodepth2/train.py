@@ -33,8 +33,8 @@ def experiment_training():
         opts.model_name = current_model_name[0]
         opts.edge_loss = True
 
-        opts.batch_size = 1
-        opts.num_workers = 1
+        opts.batch_size = 4
+        opts.num_workers = 4
         opts.num_epochs = 6
 
 
