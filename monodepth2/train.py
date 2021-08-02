@@ -38,11 +38,11 @@ def experiment_training():
     opts.num_epochs = 6
 
 
-        trainer = Trainer(opts)
-        try:
-            _ = trainer.train()
-        except:
-            traceback.print_exc(file=file)
+    trainer = Trainer(opts)
+    try:
+        _ = trainer.train()
+    except:
+        traceback.print_exc(file=file)
 
 if __name__ == "__main__":
     experiment_training()
