@@ -19,23 +19,23 @@ def experiment_training():
 
     experiment_names = ["experiment#47"]
 
-    for current_model_name in zip(experiment_names):
+    # for current_model_name in zip(experiment_names):
 
-        if os.path.exists('output_during_training.txt'):
-            os.remove('output_during_training.txt')
-        open('output_during_training.txt', 'w')
-        file = open(f'log {current_model_name}.txt', 'w')
+    if os.path.exists('output_during_training.txt'):
+        os.remove('output_during_training.txt')
+    open('output_during_training.txt', 'w')
+    file = open(f'log {current_model_name}.txt', 'w')
 
 
-        options = MonodepthOptions()
-        opts = options.parse()
+    options = MonodepthOptions()
+    opts = options.parse()
 
-        opts.model_name = current_model_name[0]
-        opts.edge_loss = True
+    opts.model_name = experiment_names[0]
+    opts.edge_loss = True
 
-        opts.batch_size = 4
-        opts.num_workers = 4
-        opts.num_epochs = 6
+    opts.batch_size = 4
+    opts.num_workers = 4
+    opts.num_epochs = 6
 
 
         trainer = Trainer(opts)
