@@ -244,21 +244,6 @@ class Trainer:
             num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
 
         self.test_iter = iter(self.test_loader)
-        #
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
         self.writers = {}
@@ -586,46 +571,45 @@ class Trainer:
     def test_all(self, current_model):
 
         loss_per_mask_size = {}
-        edge_loss_total = []
+        # edge_loss_total = []
 
         self.set_eval()
         start = time.time()
 
-        hist_dict = {}
+        # hist_dict = {}
+        #
+        # weight_size = np.arange(0, 16000, 1)
+        # attention_sizes = np.arange(0, 1.01, 0.01)
+        #
+        # # 1 ... 16000
+        # for weight_mask_size in weight_size:
+        #
+        #     hist_dict[weight_mask_size] = {}
+        #
+        #     # 0.05 ... 5
+        #     for attention_size in attention_sizes:
+        #         hist_dict[weight_mask_size][attention_size] = []
 
-        weight_size = np.arange(0, 16000, 1)
-        attention_sizes = np.arange(0, 1.01, 0.01)
-
-        # 1 ... 16000
-        for weight_mask_size in weight_size:
-
-            hist_dict[weight_mask_size] = {}
-
-            # 0.05 ... 5
-            for attention_size in attention_sizes:
-                hist_dict[weight_mask_size][attention_size] = []
 
 
-
+        hist_dict = None
 
         # loop over all the validation images
         for batch_idx, inputs in enumerate(self.test_loader):
 
-
+            # print(batch_idx)
             if batch_idx % 250 == 0:
 
                 print(batch_idx)
             with torch.no_grad():
                 outputs, losses, hist_dict = self.process_batch(inputs, batch_idx, hist_dict)
 
-                # breakpoint()
-                # edge_loss_total.append(['total_loss_without_edge'])
-                # loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
+                # edge_loss_total.append(losses['loss'].item())
+                loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
 
 
-        # save the dictionary
-        with open('validation_all/' + 'test_' + current_model + 'hist_dict' + '.pkl', 'wb') as f:
-            pickle.dump(hist_dict, f, pickle.HIGHEST_PROTOCOL)
+        with open('validation_all/' + 'test_' + current_model + '.pkl', 'wb') as f:
+            pickle.dump(loss_per_mask_size, f, pickle.HIGHEST_PROTOCOL)
 
 
         return None
@@ -1153,7 +1137,7 @@ class Trainer:
 
 
 
-            if self.opt.attention_mask_loss:
+            if self.opt.attention_mask_loss and 0 > 1:
                 """ if reprojection loss is higher then the identity loss then this is due to no camera motion or moving objects at same speed.
                 for these pixels we use the identity loss such that the loss is lower and no noise to the model
                 so you don't want to mutliply the pixels which use the identity loss because then you upsize the identity loss for these pixels
@@ -1162,7 +1146,7 @@ class Trainer:
                 for these pixels skip the weight mask, so set to 1 such that loss after multiplication doens't change
                 """
 
-
+                print("IK KOM HIER")
                 if batch_idx % self.opt.save_plot_every == 0 and self.opt.attention_mask_loss and batch_idx != 0 and scale ==0:
                     plot_loss_tensor(self, inputs, to_optimise, original_attention_masks, batch_idx, scale, idxs, identity_reprojection_loss,
                                      loss_inside_mask_tensor, loss_inside_mask_tensor_dialation_1, loss_inside_mask_tensor_dialation_3)
