@@ -617,7 +617,7 @@ class Trainer:
     def val_all(self, current_model):
         """Validate on the whole validation set"""
 
-        # loss_per_mask_size = {}
+        loss_per_mask_size = {}
         # validation_edge_loss = []
 
         # avg_dialation_size = {}
@@ -627,19 +627,20 @@ class Trainer:
         # avg_dialation_size["cover_dial_1"] = []
         # avg_dialation_size["cover_dial_3"] = []
 
-        hist_dict = {}
-
-        weight_size = np.arange(0, 16000, 1)
-        attention_sizes = np.arange(0, 1.01, 0.01)
-
-        # 1 ... 16000
-        for weight_mask_size in weight_size:
-
-            hist_dict[weight_mask_size] = {}
-
-            # 0.05 ... 5
-            for attention_size in attention_sizes:
-                hist_dict[weight_mask_size][attention_size] = []
+        # hist_dict = {}
+        #
+        # weight_size = np.arange(0, 16000, 1)
+        # attention_sizes = np.arange(0, 1.01, 0.01)
+        #
+        # # 1 ... 16000
+        # for weight_mask_size in weight_size:
+        #
+        #     hist_dict[weight_mask_size] = {}
+        #
+        #     # 0.05 ... 5
+        #     for attention_size in attention_sizes:
+        #         hist_dict[weight_mask_size][attention_size] = []
+        hist_dict = None
 
         self.set_eval()
         start = time.time()
@@ -661,15 +662,18 @@ class Trainer:
 
 
 
-                # loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
+                loss_per_mask_size = self.update_dict(losses, loss_per_mask_size)
 
             # if batch_idx == 10:
 
 
 
         # save the dictionary
-        with open('validation_all/' + current_model + 'hist_dict' + '.pkl', 'wb') as f:
-            pickle.dump(hist_dict, f, pickle.HIGHEST_PROTOCOL)
+        # with open('validation_all/' + current_model + 'hist_dict' + '.pkl', 'wb') as f:
+        #     pickle.dump(hist_dict, f, pickle.HIGHEST_PROTOCOL)
+
+        with open('validation_all/' + 'validation_' + current_model + '.pkl', 'wb') as f:
+            pickle.dump(loss_per_mask_size, f, pickle.HIGHEST_PROTOCOL)
 
         # save list
         # validation_edge_loss = np.array(validation_edge_loss)
