@@ -17,7 +17,7 @@ from options import MonodepthOptions
 def experiment_training():
 
 
-    experiment_names = ["experiment#18", "experiment#21", "experiment#26"]
+    experiment_names = ["experiment#13", "experiment#14", "experiment#20"]
     weights = ["weights_0_batch_idx9999", "weights_1_batch_idx9999", "weights_2_batch_idx9999", "weights_3_batch_idx9999", "weights_4_batch_idx9999", "weights_5_batch_idx9999"]
 
     for current_model_name in experiment_names:
@@ -35,15 +35,12 @@ def experiment_training():
             print(f'validation_all/{current_model_name}/{epoch}')
 
 
-            if current_model_name == "experiment#18":
-                epoch = epoch.split('_batch')[0]
-
             # opts.load_weights_folder = f'validation_all/{current_model_name}/models/{epoch}'
             opts.load_weights_folder = f'monodepth_models/{current_model_name}/models/{epoch}'
             opts.batch_size = 1
             opts.num_workers = 1
 
-            opts.attention_mask_loss = True
+            # opts.attention_mask_loss = True
             # opts.self_attention = True
 
 
