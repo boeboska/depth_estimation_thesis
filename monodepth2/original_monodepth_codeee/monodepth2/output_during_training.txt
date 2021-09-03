@@ -1,1 +1,0 @@
-epoch   0 | batch      0 | examples/s:   0.2 | loss: 0.20432 | time elapsed: 00h00m07s | time left: 00h00m00s
