@@ -1,6 +1,6 @@
 # Transformer-based guidance off Self-Supervised depth estimation
 
-In this repository [the results (Thesis_depth_estimation___Bob_Borsboom___10802975.pdf)](Thesis_depth_estimation___Bob_Borsboom___10802975.pdf) and code are published regarding the master thesis of Bob Borsboom for the Master Artificial Intelligence at the University of Amsterdam.
+In this repository [the research (Thesis_depth_estimation___Bob_Borsboom___10802975.pdf)](Thesis_depth_estimation___Bob_Borsboom___10802975.pdf) and code are published regarding the master thesis of Bob Borsboom for the Master Artificial Intelligence at the University of Amsterdam.
 
 
 <p align="center">
